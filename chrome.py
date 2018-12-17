@@ -22,8 +22,10 @@ from domains.Target import Target
 
 
 
-logger = logging.getLogger('cdi.chrome')
+logger = logging.getLogger("cdi.chrome")
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
+
+logging.getLogger("websockets").setLevel(logging.ERROR)
 
 
 DEFAULT_ARGS = [
