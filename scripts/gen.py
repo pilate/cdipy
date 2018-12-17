@@ -4,7 +4,7 @@ import logging
 
 
 
-logger = logging.getLogger('chromer.generator')
+logger = logging.getLogger("cdipy.scripts.gen")
 logger.setLevel(10)
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
 

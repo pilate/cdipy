@@ -22,7 +22,7 @@ from domains.Target import Target
 
 
 
-logger = logging.getLogger('cdt')
+logger = logging.getLogger('cdi.chrome')
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
 
 
@@ -118,6 +118,7 @@ class ChromeDevTools(EventEmitter):
         self.on("Target.receivedMessageFromTarget", self._target_recv)
 
         self.connected = True
+
         self.Browser = Browser(self)
         self.Network = Network(self)
         self.Target = Target(self)
@@ -206,15 +207,3 @@ class ChromeDevTools(EventEmitter):
 
         response = await result_future
         return response
-
-
-
-
-"""
-
-connect(uri, *, create_protocol=None, timeout=10, max_size=2 ** 20, max_queue=2 ** 5, read_limit=2 ** 16, write_limit=2 ** 16, loop=None, origin=None, extensions=None, subprotocols=None, extra_headers=None, compression='deflate', **kwds)
-connect(uri, *, create_protocol=None,             max_size=2 ** 20, max_queue=2 ** 5, read_limit=2 ** 16, write_limit=2 ** 16, loop=None, origin=None, extensions=None, subprotocols=None, extra_headers=None, compression='deflate', **kwds)
-
-ping_interval=20, ping_timeout=20, close_timeout=10, 
-
-"""
