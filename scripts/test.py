@@ -27,26 +27,8 @@ async def main():
     await asyncio.sleep(5)
     import base64
     screenshot = base64.b64decode((await cdt.Page.captureScreenshot(format="png"))["data"])
-    open("umf.png", "w+b").write(screenshot)
+    open("google.png", "w+b").write(screenshot)
     await asyncio.sleep(10)
 
 
 asyncio.get_event_loop().run_until_complete(main())
-
-
-
-"""
-
-
-
-class attribattrib(object):
-    def __getattribute__(self,  attrib):
-        print(attrib)
-
-
-a = attribattrib()
-a.Test.thing
-
-
-
-"""
