@@ -40,7 +40,7 @@ class Page(object):
     async def captureSnapshot(self, format=None):
         """
             Returns a snapshot of the page as a string. For MHTML format, the serialization includes
-iframes, shadow DOM, external resources, and element-inline styles.
+            iframes, shadow DOM, external resources, and element-inline styles.
         """
 
 
@@ -104,7 +104,7 @@ iframes, shadow DOM, external resources, and element-inline styles.
     async def getCookies(self):
         """
             Returns all browser cookies. Depending on the backend support, will return detailed cookie
-information in the `cookies` field.
+            information in the `cookies` field.
         """
 
 
@@ -238,8 +238,8 @@ information in the `cookies` field.
     async def setDeviceMetricsOverride(self, width, height, deviceScaleFactor, mobile, scale=None, screenWidth=None, screenHeight=None, positionX=None, positionY=None, dontSetVisibleSize=None, screenOrientation=None, viewport=None):
         """
             Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
-window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
-query results).
+            window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
+            query results).
         """
 
 
@@ -282,7 +282,7 @@ query results).
     async def setGeolocationOverride(self, latitude=None, longitude=None, accuracy=None):
         """
             Overrides the Geolocation Position or Error. Omitting any of the parameters emulates position
-unavailable.
+            unavailable.
         """
 
 
@@ -332,8 +332,8 @@ unavailable.
     async def setWebLifecycleState(self, state):
         """
             Tries to update the web lifecycle state of the page.
-It will transition the page to the given state according to:
-https://github.com/WICG/web-lifecycle/
+            It will transition the page to the given state according to:
+            https://github.com/WICG/web-lifecycle/
         """
 
 
@@ -355,7 +355,7 @@ https://github.com/WICG/web-lifecycle/
     async def addCompilationCache(self, url, data):
         """
             Seeds compilation cache for given url. Compilation cache does not survive
-cross-process navigation.
+            cross-process navigation.
         """
 
 
