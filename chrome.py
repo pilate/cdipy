@@ -119,8 +119,6 @@ class ChromeDevTools(EventEmitter):
         self.on("Target.attachedToTarget", self._attached)
         self.on("Target.receivedMessageFromTarget", self._target_recv)
 
-        self.connected = True
-
         self.Browser = Browser(self)
         self.Network = Network(self)
         self.Target = Target(self)
@@ -128,9 +126,6 @@ class ChromeDevTools(EventEmitter):
 
 
     async def send(self, command):
-        if not self.connected:
-            raise websockets.ConnectionClosed()
-
         logger.debug(f"send: {command}")
         await self.websocket.send(ujson.dumps(command))
 
