@@ -15,11 +15,6 @@ from pyee import EventEmitter
 import ujson
 import websockets
 
-from domains.Browser import Browser
-from domains.Network import Network
-from domains.Page import Page
-from domains.Target import Target
-
 
 
 logger = logging.getLogger("cdi.chrome")
@@ -55,6 +50,7 @@ DEFAULT_ARGS = [
 
 CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
+
 
 
 # Browser process
@@ -118,11 +114,6 @@ class ChromeDevTools(EventEmitter):
 
         self.on("Target.attachedToTarget", self._attached)
         self.on("Target.receivedMessageFromTarget", self._target_recv)
-
-        self.Browser = Browser(self)
-        self.Network = Network(self)
-        self.Target = Target(self)
-        self.Page = Page(self)
 
 
     async def send(self, command):
