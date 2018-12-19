@@ -122,6 +122,8 @@ class ChromeDevTools(EventEmitter):
 
 
     async def handle_message(self, message):
+        message = ujson.loads(message)
+
         if "id" in message:
             if "error" in message:
                 self.future_map[message["id"]].set_exception(
@@ -151,8 +153,7 @@ class ChromeDevTools(EventEmitter):
             except Exception as e:
                 logger.warn(f"failed to wait forever {e}")
 
-            message = ujson.loads(recv_data)
-            await self.handle_message(message)
+            await self.handle_message(recv_data)
 
 
     async def _attached(self, sessionId, targetInfo, waitingForDebugger):
@@ -160,7 +161,7 @@ class ChromeDevTools(EventEmitter):
 
 
     async def _target_recv(self, sessionId, message, targetId=None):
-        await self.handle_message(ujson.loads(message))
+        await self.handle_message(message)
 
 
     def create_command(self, method, **kwargs):
