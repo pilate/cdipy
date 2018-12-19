@@ -38,18 +38,11 @@ def proxy_target_command(fn):
 
     @wraps(fn)
     async def wrapper(*args, **kwargs):
-        self = args[0]
-
-        # Make all args kwargs
-        for offset, arg in enumerate(args):
-            arg_name = argspec.args[offset]
-            if arg_name == "self":
-                continue
-            kwargs[arg_name] = arg
-
+        bound = fn._sig.bind(*args, **kwargs)
+        kwargs = bound.arguments
+        self = kwargs.pop("self")
         kwargs["sessionId"] = kwargs.get("sessionId", self.devtools.attached_session)
-
-        command = ".".join([self.__class__.__name__, fn.__name__])
+        command = f"{self.__class__.__name__}.{fn.__name__}"
         return await self.devtools.run_target_command(command, **kwargs)
 
     return wrapper
@@ -90,6 +83,16 @@ class DomainProxy(object):
         setattr(self, command["name"], MethodType(proxy_command(function), self))
 
 
+def populate_domains(obj, domains):
+    for domain in domains:
+        domain_class = types.new_class(domain["domain"], (DomainProxy, ))
+        new_instance = domain_class(obj)
+        for command in domain.get("commands", []):
+            new_instance.add_command(command)
+            
+        setattr(obj, domain["domain"], new_instance)
+
+
 async def main():
     protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json").json()
 
@@ -99,13 +102,7 @@ async def main():
     cdt = ChromeDevTools()
     await cdt.launch()
 
-    for domain in protocol["domains"]:
-        domain_class = types.new_class(domain["domain"], (DomainProxy, ))
-        blank = domain_class(cdt)
-        for command in domain.get("commands", []):
-            blank.add_command(command)
-            
-        setattr(cdt, domain["domain"], blank)
+    populate_domains(cdt, protocol["domains"])
 
     target = await cdt.Target.createTarget("about:blank")
     session = await cdt.Target.attachToTarget(targetId=target["targetId"])
