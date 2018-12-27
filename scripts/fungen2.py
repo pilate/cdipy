@@ -21,35 +21,8 @@ logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
 SELF_PARAM = inspect.Parameter(name="self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
 
 
-def proxy_command(fn):
-    @wraps(fn)
-    async def wrapper(*args, **kwargs):
-        bound = fn._sig.bind(*args, **kwargs)
-        kwargs = bound.arguments
-        self = kwargs.pop("self")
-        command = f"{self.__class__.__name__}.{fn.__name__}"
-        return await self.devtools.run_command(command, **kwargs)
-
-    return wrapper
-
-
-def proxy_target_command(fn):
-    argspec = inspect.getargspec(fn)
-
-    @wraps(fn)
-    async def wrapper(*args, **kwargs):
-        bound = fn._sig.bind(*args, **kwargs)
-        kwargs = bound.arguments
-        self = kwargs.pop("self")
-        kwargs["sessionId"] = kwargs.get("sessionId", self.devtools.attached_session)
-        command = f"{self.__class__.__name__}.{fn.__name__}"
-        return await self.devtools.run_target_command(command, **kwargs)
-
-    return wrapper
-
-
 def create_signature(params):
-    new_params = [SELF_PARAM]
+    new_params = []
 
     for param in params:
         default = inspect.Parameter.empty
@@ -72,15 +45,13 @@ class DomainProxy(object):
         self.devtools = devtools
 
 
-    def add_command(self, command):
-
-        def function(*args, **kwargs):
-            pass
-
-        function._sig = create_signature(command.get("parameters", []))
-        function.__name__ = function.__qualname__ = command["name"]
-
-        setattr(self, command["name"], MethodType(proxy_command(function), self))
+def wrap_factory(command_name, signature):
+    async def wrapper(self, *args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        kwargs = bound.arguments
+        command = f"{self.__class__.__name__}.{command_name}"
+        return await self.devtools.run_command(command, **kwargs)
+    return wrapper
 
 
 def populate_domains(obj, domains):
@@ -88,8 +59,11 @@ def populate_domains(obj, domains):
         domain_class = types.new_class(domain["domain"], (DomainProxy, ))
         new_instance = domain_class(obj)
         for command in domain.get("commands", []):
-            new_instance.add_command(command)
-            
+            method_sig = create_signature(command.get("parameters", []))
+            new_method = MethodType(wrap_factory(command["name"], method_sig), new_instance)
+
+            setattr(new_instance, command["name"], new_method)
+
         setattr(obj, domain["domain"], new_instance)
 
 
