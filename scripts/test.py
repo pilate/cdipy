@@ -43,9 +43,7 @@ async def main():
     print(f"Session: {session}")
 
     cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
-    print(f"cdit: {cdit}")
 
-    print(dir(cdit))
     await asyncio.gather(
         cdit.Network.enable(),
         cdit.Page.enable(),
