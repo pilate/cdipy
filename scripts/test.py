@@ -2,6 +2,7 @@ from functools import wraps
 from types import MethodType
 
 import asyncio
+import base64
 import inspect
 import logging
 import types
@@ -83,9 +84,14 @@ async def main():
     #
     # cdit.on("Network.responseReceived", printer)
 
-    await cdit.Page.navigate("https://google.com/")
-
+    await cdit.Emulation.setDeviceMetricsOverride(width=1024, height=768, deviceScaleFactor=0, mobile=False)
+    
+    await cdit.Page.navigate("https://ultramusicfestival.com/")
     await asyncio.sleep(10)
+
+    screenshot_response = await cdit.Page.captureScreenshot(format="png")
+    screenshot_bytes = base64.b64decode(screenshot_response["data"])
+    open("screenshot.png", "w+b").write(screenshot_bytes)
 
 
 
