@@ -32,7 +32,7 @@ logging.getLogger("websockets").setLevel(logging.ERROR)
 
 def create_signature(params):
     """
-        Creates a function signature based on protocol parameters
+        Creates a function signature based on a list of protocol parameters
     """
     new_params = []
 
@@ -53,7 +53,7 @@ def create_signature(params):
 
 class DomainProxy(object):
     """
-        Template class used for domain objects (ex: obj.Page)
+        Template class used for domains (ex: obj.Page)
     """
 
     def __init__(self, devtools):
@@ -85,8 +85,27 @@ class Devtools(EventEmitter):
 
         self.future_map = {}
         self.command_id = random.randint(0, 2**16)
+        self.domains = []
 
         self.loop = asyncio.get_event_loop()
+
+
+    def populate_domains(self):
+        """
+            Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
+        """
+        for domain in self.domains:
+            # Create a new class for each domain with the correct name
+            domain_class = types.new_class(domain["domain"], (DomainProxy, ))
+            new_instance = domain_class(self)
+            for command in domain.get("commands", []):
+                # Create a new method for each domain command
+                method_sig = create_signature(command.get("parameters", []))
+                new_fn = wrap_factory(command["name"], method_sig)
+                new_method = types.MethodType(new_fn, new_instance)
+                setattr(new_instance, command["name"], new_method)
+
+            setattr(self, domain["domain"], new_instance)
 
 
     def format_command(self, method, **kwargs):
@@ -138,24 +157,6 @@ class Devtools(EventEmitter):
         await self.send(command)
 
         return await result_future
-
-
-    def populate_domains(self):
-        """
-            Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
-        """
-        for domain in self.domains:
-            # Create a new class for each domain with the correct name
-            domain_class = types.new_class(domain["domain"], (DomainProxy, ))
-            new_instance = domain_class(self)
-            for command in domain.get("commands", []):
-                # Create a new method for each domain command
-                method_sig = create_signature(command.get("parameters", []))
-                new_fn = wrap_factory(command["name"], method_sig)
-                new_method = types.MethodType(new_fn, new_instance)
-                setattr(new_instance, command["name"], new_method)
-
-            setattr(self, domain["domain"], new_instance)
 
 
 class ChromeDevTools(Devtools):
