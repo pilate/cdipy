@@ -2,17 +2,22 @@ from pathlib import Path
 
 import asyncio
 import asyncio.subprocess as subprocess
+import inspect
 import logging
 import os
-import random
 import re
 import shutil
 import signal
 import tempfile
+import types
 
 from pyee import EventEmitter
 
-import ujson
+try:
+    import ujson as json
+except:
+    import json
+
 import websockets
 
 
@@ -52,25 +57,19 @@ CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
-
-# Browser process
-class ChromeDevTools(EventEmitter):
+class ChromeRunner(object):
 
     def __init__(self, proxy=None):
         super().__init__()
 
         self.proxy = proxy
 
-        self.command_id = 0
         self.tmp_path = Path(tempfile.mkdtemp())
-        self.connected = False
-        self.loop = asyncio.get_event_loop()
-        self.future_map = {}
-        self.attached_session = None
+        self.websocket_uri = None
 
 
     # Browser cleanup
-    async def close(self):
+    def __del__(self):
          # Kill chrome and all of its child processes
         try:
             os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
@@ -105,26 +104,83 @@ class ChromeDevTools(EventEmitter):
             if search:
                 break
 
-        self.ws_uri = search.group(1).strip()
-        logger.info(f"Found websocket URI: {self.ws_uri}")
-
-        self.websocket = await websockets.client.connect(self.ws_uri, 
-            max_size=2**40, read_limit=2**40, max_queue=0)
-        self.task = asyncio.ensure_future(self._recv_loop())
-
-        self.on("Target.attachedToTarget", self._attached)
-        self.on("Target.receivedMessageFromTarget", self._target_recv)
+        self.websocket_uri = search.group(1).strip()
+        logger.info(f"Parsed websocket URI: {self.websocket_uri}")
 
 
-    async def send(self, command):
-        logger.debug(f"send: {command}")
-        await self.websocket.send(ujson.dumps(command))
+def create_signature(params):
+    new_params = []
+
+    for param in params:
+        default = inspect.Parameter.empty
+        if param.get("optional"):
+            default = None
+
+        new_param = inspect.Parameter(
+            name=param["name"], 
+            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            default=default)
+
+        new_params.append(new_param)   
+
+    return inspect.Signature(parameters=new_params)
+
+
+class DomainProxy(object):
+
+    def __init__(self, devtools):
+        self.devtools = devtools
+
+
+def wrap_factory(command_name, signature):
+    async def wrapper(self, *args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        kwargs = bound.arguments
+        command = f"{self.__class__.__name__}.{command_name}"
+        return await self.devtools.execute_method(command, **kwargs)
+    return wrapper
+
+
+def populate_domains(obj, domains):
+    for domain in domains:
+        domain_class = types.new_class(domain["domain"], (DomainProxy, ))
+        new_instance = domain_class(obj)
+        for command in domain.get("commands", []):
+            method_sig = create_signature(command.get("parameters", []))
+            new_method = types.MethodType(wrap_factory(command["name"], method_sig), new_instance)
+            setattr(new_instance, command["name"], new_method)
+
+        setattr(obj, domain["domain"], new_instance)
+
+
+class Devtools(EventEmitter):
+
+    def __init__(self):
+        super().__init__()
+
+        self.future_map = {}
+        self.command_id = 0
+
+        self.loop = asyncio.get_event_loop()
+
+
+    def format_command(self, method, **kwargs):
+        self.command_id += 1
+
+        return {
+            "id": self.command_id,
+            "method": method,
+            "params": kwargs
+        }
 
 
     async def handle_message(self, message):
-        message = ujson.loads(message)
+        message = json.loads(message)
 
         if "id" in message:
+            if message["id"] not in self.future_map:
+                return
+
             if "error" in message:
                 self.future_map[message["id"]].set_exception(
                     Exception(message["error"]["message"]))
@@ -140,6 +196,30 @@ class ChromeDevTools(EventEmitter):
             raise Exception(f"Unknown message format: {message}")
 
 
+    async def _target_recv(self, sessionId, message, targetId=None):
+        await self.handle_message(message)
+
+
+
+class ChromeDevTools(Devtools):
+
+    def __init__(self, websocket_uri, protocol):
+        super().__init__()
+
+        self.ws_uri = websocket_uri
+        self.protocol = protocol
+
+        populate_domains(self, self.protocol["domains"])
+
+        self.on("Target.receivedMessageFromTarget", self._target_recv)
+
+
+    async def connect(self):
+        self.websocket = await websockets.client.connect(self.ws_uri, 
+            max_size=2**40, read_limit=2**40, max_queue=0)
+        self.task = asyncio.ensure_future(self._recv_loop())
+
+
     async def _recv_loop(self):
         while True:
             try:
@@ -150,32 +230,16 @@ class ChromeDevTools(EventEmitter):
                 logger.error("Websocket connection closed")
                 break
 
-            except Exception as e:
-                logger.warn(f"failed to wait forever {e}")
-
             await self.handle_message(recv_data)
 
 
-    async def _attached(self, sessionId, targetInfo, waitingForDebugger):
-        self.attached_session = sessionId
+    async def send(self, command):
+        logger.debug(f"send: {command}")
+        await self.websocket.send(json.dumps(command))
 
 
-    async def _target_recv(self, sessionId, message, targetId=None):
-        await self.handle_message(message)
-
-
-    def create_command(self, method, **kwargs):
-        self.command_id += 1
-
-        return {
-            "id": self.command_id,
-            "method": method,
-            "params": kwargs
-        }
-
-
-    async def run_command(self, method, **kwargs):
-        command = self.create_command(method, **kwargs)
+    async def execute_method(self, method, **kwargs):
+        command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
         self.future_map[command["id"]] = result_future
@@ -186,13 +250,26 @@ class ChromeDevTools(EventEmitter):
         return response
 
 
-    async def run_target_command(self, method, sessionId, **kwargs):
-        command = self.create_command(method, **kwargs)
+class ChromeDevToolsTarget(Devtools):
+
+    def __init__(self, devtools, session):
+        super().__init__()
+
+        self.devtools = devtools
+        self.session = session
+
+        populate_domains(self, self.devtools.protocol["domains"])
+
+        self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
+
+
+    async def execute_method(self, method, **kwargs):
+        command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
         self.future_map[command["id"]] = result_future
 
-        await self.Target.sendMessageToTarget(ujson.dumps(command), sessionId)
+        await self.devtools.Target.sendMessageToTarget(json.dumps(command), self.session)
 
         response = await result_future
         return response

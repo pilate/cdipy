@@ -8,9 +8,7 @@ import types
 
 import requests
 
-from chrome import ChromeDevTools
-
-
+from chrome import ChromeDevTools, ChromeRunner, ChromeDevToolsTarget
 
 
 logger = logging.getLogger("cdipy.scripts.gen")
@@ -18,53 +16,8 @@ logger.setLevel(10)
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
  
 
-SELF_PARAM = inspect.Parameter(name="self", kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
-
-
-def create_signature(params):
-    new_params = []
-
-    for param in params:
-        default = inspect.Parameter.empty
-        if param.get("optional"):
-            default = None
-
-        new_param = inspect.Parameter(
-            name=param["name"], 
-            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=default)
-
-        new_params.append(new_param)   
-
-    return inspect.Signature(parameters=new_params)
-
-
-class DomainProxy(object):
-
-    def __init__(self, devtools):
-        self.devtools = devtools
-
-
-def wrap_factory(command_name, signature):
-    async def wrapper(self, *args, **kwargs):
-        bound = signature.bind(*args, **kwargs)
-        kwargs = bound.arguments
-        command = f"{self.__class__.__name__}.{command_name}"
-        return await self.devtools.run_command(command, **kwargs)
-    return wrapper
-
-
-def populate_domains(obj, domains):
-    for domain in domains:
-        domain_class = types.new_class(domain["domain"], (DomainProxy, ))
-        new_instance = domain_class(obj)
-        for command in domain.get("commands", []):
-            method_sig = create_signature(command.get("parameters", []))
-            new_method = MethodType(wrap_factory(command["name"], method_sig), new_instance)
-
-            setattr(new_instance, command["name"], new_method)
-
-        setattr(obj, domain["domain"], new_instance)
+def printer(*args, **kwargs):
+    print(f"{args}, {kwargs}")
 
 
 async def main():
@@ -73,18 +26,32 @@ async def main():
     logger.debug("Generating objects for protocol version {0}.{1}".format(
         protocol["version"]["major"], protocol["version"]["minor"]))
 
-    cdt = ChromeDevTools()
-    await cdt.launch()
+    chrome = ChromeRunner()
+    await chrome.launch()
+    
+    cdi = ChromeDevTools(chrome.websocket_uri, protocol)
+    await cdi.connect()
 
-    populate_domains(cdt, protocol["domains"])
+    target = await cdi.Target.createTarget("about:blank")
+    print(f"Target: {target}")
 
-    target = await cdt.Target.createTarget("about:blank")
-    session = await cdt.Target.attachToTarget(targetId=target["targetId"])
-    await cdt.Page.enable()
-    await cdt.Network.enable()
-    await cdt.Target.detachFromTarget(**session)
+    session = await cdi.Target.attachToTarget(targetId=target["targetId"])
+    print(f"Session: {session}")
 
+    cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
+    print(f"cdit: {cdit}")
 
+    await asyncio.gather(
+        cdit.Page.enable(),
+        cdit.Network.enable()
+    )
+    print("page/network enabled")
+    
+    await cdit.Page.navigate("https://google.com/")
+
+    # cdit.on("Network.responseReceived", printer)
+
+    await asyncio.sleep(10)
 
 
 
