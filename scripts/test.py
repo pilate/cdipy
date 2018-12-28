@@ -1,33 +1,83 @@
+from functools import wraps
+from types import MethodType
+
 import asyncio
-import base64
+import inspect
 import logging
+import types
 
-from chrome import ChromeDevTools
+import requests
+
+from chrome import ChromeDevTools, ChromeRunner, ChromeDevToolsTarget
 
 
-logger = logging.getLogger("cdipy.scripts.test")
-logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
+logger = logging.getLogger("cdipy.scripts.gen")
+logger.setLevel(10)
+logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
+ 
 
+def printer(*args, **kwargs):
+    print(f"{args}, {kwargs}")
 
 
 async def main():
-    cdt = ChromeDevTools()
-    await cdt.launch()
+    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json").json()
 
-    target = await cdt.Target.createTarget("about:blank")
-    session = await cdt.Target.attachToTarget(targetId=target["targetId"])
+    logger.debug("Generating objects for protocol version {0}.{1}".format(
+        protocol["version"]["major"], protocol["version"]["minor"]))
 
-    await cdt.Page.enable()
-    await cdt.Network.enable()
-    await cdt.Page.navigate("https://google.com")
-
-    await asyncio.sleep(5)
-
-    ss_response = await cdt.Page.captureScreenshot(format="png")
-    screenshot = base64.b64decode(ss_response["data"])
-    open("google.png", "w+b").write(screenshot)
+    chrome = ChromeRunner()
+    await chrome.launch()
     
+    cdi = ChromeDevTools(chrome.websocket_uri, protocol)
+    await cdi.connect()
+
+    target = await cdi.Target.createTarget("about:blank")
+    print(f"Target: {target}")
+
+    session = await cdi.Target.attachToTarget(targetId=target["targetId"])
+    print(f"Session: {session}")
+
+    cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
+    print(f"cdit: {cdit}")
+
+    await asyncio.gather(
+        cdit.Network.enable(),
+        cdit.Page.enable())
+
+    # await asyncio.gather(
+    #     cdit.Animation.enable(),
+    #     cdit.ApplicationCache.enable(),
+    #     cdit.DOM.enable(),
+    #     cdit.DOMSnapshot.enable(),
+    #     cdit.DOMStorage.enable(),
+    #     cdit.Database.enable(),
+    #     cdit.HeadlessExperimental.enable(),
+    #     cdit.IndexedDB.enable(),
+    #     cdit.Inspector.enable(),
+    #     cdit.LayerTree.enable(),
+    #     cdit.Log.enable(),
+    #     cdit.Network.enable(),
+    #     cdit.Overlay.enable(),
+    #     cdit.Page.enable(),
+    #     cdit.Performance.enable(),
+    #     cdit.Security.enable(),
+    #     cdit.ServiceWorker.enable())
+
+    # await asyncio.gather(
+    #     cdit.DOMDebugger.setXHRBreakpoint("http"),
+    #     cdit.Tracing.start())
+
+    # await cdi.Tethering.bind(9999)
+
+    print("page/network enabled")
+    
+    await cdit.Page.navigate("https://google.com/")
+
+    # cdit.on("Network.responseReceived", printer)
+
     await asyncio.sleep(10)
+
 
 
 asyncio.get_event_loop().run_until_complete(main())
