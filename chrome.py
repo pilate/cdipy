@@ -5,6 +5,7 @@ import asyncio.subprocess as subprocess
 import inspect
 import logging
 import os
+import random
 import re
 import shutil
 import signal
@@ -22,7 +23,7 @@ import websockets
 
 
 
-logger = logging.getLogger("cdi.chrome")
+logger = logging.getLogger("cdipy.chrome")
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
 
 logging.getLogger("websockets").setLevel(logging.ERROR)
@@ -159,7 +160,7 @@ class Devtools(EventEmitter):
         super().__init__()
 
         self.future_map = {}
-        self.command_id = 0
+        self.command_id = random.randint(0, 2**16)
 
         self.loop = asyncio.get_event_loop()
 
@@ -181,14 +182,12 @@ class Devtools(EventEmitter):
             if message["id"] not in self.future_map:
                 return
 
+            future = self.future_map.pop(message["id"])
             if "error" in message:
-                self.future_map[message["id"]].set_exception(
-                    Exception(message["error"]["message"]))
+                future.set_exception(Exception(message["error"]["message"]))
             else:
-                self.future_map[message["id"]].set_result(message["result"])
+                future.set_result(message["result"])
 
-            del self.future_map[message["id"]]
-        
         elif "method" in message:
             self.emit(message["method"], **message["params"])
 
@@ -198,7 +197,6 @@ class Devtools(EventEmitter):
 
     async def _target_recv(self, sessionId, message, targetId=None):
         await self.handle_message(message)
-
 
 
 class ChromeDevTools(Devtools):

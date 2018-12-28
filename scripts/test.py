@@ -11,7 +11,7 @@ import requests
 from chrome import ChromeDevTools, ChromeRunner, ChromeDevToolsTarget
 
 
-logger = logging.getLogger("cdipy.scripts.gen")
+logger = logging.getLogger("cdipy.scripts.test")
 logger.setLevel(10)
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
  
@@ -69,8 +69,6 @@ async def main():
     #     cdit.Tracing.start())
 
     # await cdi.Tethering.bind(9999)
-
-    print("page/network enabled")
     
     await cdit.Page.navigate("https://google.com/")
 
