@@ -9,7 +9,7 @@ import types
 
 import requests
 
-from cdipy import ChromeDevTools, 
+from cdipy import ChromeDevTools
 from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
