@@ -22,15 +22,21 @@ def printer(*args, **kwargs):
 
 
 async def main():
-    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json").json()
 
+    domains = []
+    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json").json()
+    domains += protocol["domains"]
+
+    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json").json()
+    domains += protocol["domains"]
+    
     logger.debug("Generating objects for protocol version {0}.{1}".format(
         protocol["version"]["major"], protocol["version"]["minor"]))
 
     chrome = ChromeRunner()
     await chrome.launch()
     
-    cdi = ChromeDevTools(chrome.websocket_uri, protocol)
+    cdi = ChromeDevTools(chrome.websocket_uri, domains)
     await cdi.connect()
 
     target = await cdi.Target.createTarget("about:blank")
@@ -42,9 +48,14 @@ async def main():
     cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
     print(f"cdit: {cdit}")
 
+    print(dir(cdit))
     await asyncio.gather(
         cdit.Network.enable(),
-        cdit.Page.enable())
+        cdit.Page.enable(),
+        cdit.Runtime.enable(),
+        cdit.Debugger.enable(),
+        cdit.Security.enable(),
+        cdit.Page.setDownloadBehavior(behavior="allow", downloadPath=str(chrome.tmp_path)))
 
     # await asyncio.gather(
     #     cdit.Animation.enable(),
@@ -72,7 +83,6 @@ async def main():
     # await cdi.Tethering.bind(9999)
     
     await cdit.Page.navigate("https://google.com/")
-
     # cdit.on("Network.responseReceived", printer)
 
     await asyncio.sleep(10)

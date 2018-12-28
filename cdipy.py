@@ -60,7 +60,7 @@ class DomainProxy(object):
 def wrap_factory(command_name, signature):
     """
         Returns a function that will validate its arguments against <signature>
-         and attempt to execute the command
+        and attempt to execute the command
     """
 
     async def wrapper(self, *args, **kwargs):
@@ -73,7 +73,7 @@ def wrap_factory(command_name, signature):
 
 def populate_domains(obj, domains):
     """
-        Add domains and methods to obj (ex: obj.Page, obj.Network)
+        Add domains and methods to obj (ex: obj.Page, obj.Page.enable)
 
         DomainProxy is the template for all domains
         wrap_factory is used to generate the methods
@@ -105,7 +105,7 @@ class Devtools(EventEmitter):
 
     def format_command(self, method, **kwargs):
         """
-            Convert method name + arguments to a devtools websocket command
+            Convert method name + arguments to a devtools command
         """
 
         self.command_id += 1
@@ -145,13 +145,13 @@ class Devtools(EventEmitter):
 
 class ChromeDevTools(Devtools):
 
-    def __init__(self, websocket_uri, protocol):
+    def __init__(self, websocket_uri, domains):
         super().__init__()
 
         self.ws_uri = websocket_uri
-        self.protocol = protocol
+        self.domains = domains
 
-        populate_domains(self, self.protocol["domains"])
+        populate_domains(self, self.domains)
 
 
     async def connect(self):
@@ -199,7 +199,7 @@ class ChromeDevToolsTarget(Devtools):
 
         self.session = session
 
-        populate_domains(self, self.devtools.protocol["domains"])
+        populate_domains(self, self.devtools.domains)
 
 
     async def _target_recv(self, sessionId, message, targetId=None):
