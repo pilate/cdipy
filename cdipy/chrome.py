@@ -74,8 +74,12 @@ class ChromeRunner(object):
             logger.debug(f"Failed to delete user-data-dir: {self.tmp_path}")
 
 
-    async def launch(self, chrome_path=CHROME_PATH):
+    async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
         command = [chrome_path] + DEFAULT_ARGS + [f"--user-data-dir={self.tmp_path}"]
+
+        if extra_args:
+            command += extra_args
+
         if self.proxy:
             command += [f"--proxy-server={self.proxy}"]
 
