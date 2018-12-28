@@ -84,9 +84,10 @@ async def main():
     # cdit.on("Network.responseReceived", printer)
 
     await cdit.Emulation.setDeviceMetricsOverride(width=1024, height=768, deviceScaleFactor=0, mobile=False)
-    
+    await cdit.Network.setUserAgentOverride(userAgent="Definitely not headless Chrome")
+   
     await cdit.Page.navigate("https://ultramusicfestival.com/")
-    # await cdit.Page.navigate("http://pilate.es/malware2.2")
+
     await asyncio.sleep(10)
 
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
