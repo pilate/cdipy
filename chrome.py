@@ -46,12 +46,16 @@ WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 class ChromeRunner(object):
 
-    def __init__(self, proxy=None):
+    def __init__(self, proxy=None, tmp_path=None):
         super().__init__()
 
         self.proxy = proxy
 
-        self.tmp_path = Path(tempfile.mkdtemp())
+        if tmp_path:
+            self.tmp_path = tmp_path
+        else:
+            self.tmp_path = Path(tempfile.mkdtemp())
+
         self.websocket_uri = None
 
 
