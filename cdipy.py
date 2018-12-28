@@ -104,6 +104,10 @@ class Devtools(EventEmitter):
 
 
     def format_command(self, method, **kwargs):
+        """
+            Convert method name + arguments to a devtools websocket command
+        """
+
         self.command_id += 1
 
         return {
@@ -114,6 +118,12 @@ class Devtools(EventEmitter):
 
 
     async def handle_message(self, message):
+        """
+            Match incoming message ids against our dict of pending futures
+
+            Emit events for incomming methods
+        """
+
         message = json.loads(message)
 
         if "id" in message:
@@ -133,10 +143,6 @@ class Devtools(EventEmitter):
             raise Exception(f"Unknown message format: {message}")
 
 
-    async def _target_recv(self, sessionId, message, targetId=None):
-        await self.handle_message(message)
-
-
 class ChromeDevTools(Devtools):
 
     def __init__(self, websocket_uri, protocol):
@@ -146,8 +152,6 @@ class ChromeDevTools(Devtools):
         self.protocol = protocol
 
         populate_domains(self, self.protocol["domains"])
-
-        self.on("Target.receivedMessageFromTarget", self._target_recv)
 
 
     async def connect(self):
@@ -196,6 +200,13 @@ class ChromeDevToolsTarget(Devtools):
         self.session = session
 
         populate_domains(self, self.devtools.protocol["domains"])
+
+
+    async def _target_recv(self, sessionId, message, targetId=None):
+        if sessionId != self.session:
+            return
+
+        await self.handle_message(message)
 
 
     async def execute_method(self, method, **kwargs):
