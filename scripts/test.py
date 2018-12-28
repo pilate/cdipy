@@ -8,7 +8,8 @@ import types
 
 import requests
 
-from cdipy import ChromeDevTools, ChromeRunner, ChromeDevToolsTarget
+from chrome import ChromeRunner
+from cdipy import ChromeDevTools, ChromeDevToolsTarget
 
 
 logger = logging.getLogger("cdipy.scripts.test")
