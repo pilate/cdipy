@@ -13,20 +13,18 @@ RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - 
 && apt-get install -y google-chrome-stable
 
 # Python layer
-RUN apt-get install -y bash nano vim \
-&& pip install --upgrade pip \
-&& pip install boto3 psutil ujson nose moto pyee
+RUN pip install --upgrade pip \
+&& pip install pyee requests setuptools ujson websockets==6.0
 
-RUN pip install websockets==6.0
+COPY . /opt/cdipy
+WORKDIR /opt/cdipy
+RUN python setup.py install
 
 # Making non-root user for chrome
 RUN useradd -ms /bin/bash user
 RUN mkdir -p /opt/cdipy
 RUN chown -R user /opt/cdipy
-COPY . /opt/cdipy
+
 USER user
-WORKDIR /opt/cdipy
-ENV PYTHONPATH .
-ENV CHROME_PATH /usr/bin/google-chrome-stable
 
 CMD ["bash"]

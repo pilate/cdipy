@@ -9,8 +9,9 @@ import types
 
 import requests
 
-from chrome import ChromeRunner
-from cdipy import ChromeDevTools, ChromeDevToolsTarget
+from cdipy import ChromeDevTools, 
+from cdipy import ChromeDevToolsTarget
+from cdipy import ChromeRunner
 
 
 logger = logging.getLogger("cdipy.scripts.test")
@@ -85,6 +86,7 @@ async def main():
     await cdit.Emulation.setDeviceMetricsOverride(width=1024, height=768, deviceScaleFactor=0, mobile=False)
     
     await cdit.Page.navigate("https://ultramusicfestival.com/")
+    # await cdit.Page.navigate("http://pilate.es/malware2.2")
     await asyncio.sleep(10)
 
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
