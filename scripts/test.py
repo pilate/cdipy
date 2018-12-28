@@ -17,10 +17,6 @@ logger.setLevel(10)
 logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
  
 
-def printer(*args, **kwargs):
-    print(f"{args}, {kwargs}")
-
-
 async def main():
 
     domains = []
@@ -81,9 +77,13 @@ async def main():
     #     cdit.Tracing.start())
 
     # await cdi.Tethering.bind(9999)
-    
-    await cdit.Page.navigate("https://google.com/")
+
+    # def printer(*args, **kwargs):
+    #     print(f"{args}, {kwargs}")
+    #
     # cdit.on("Network.responseReceived", printer)
+
+    await cdit.Page.navigate("https://google.com/")
 
     await asyncio.sleep(10)
 
