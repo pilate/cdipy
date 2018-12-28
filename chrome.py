@@ -74,13 +74,13 @@ class ChromeRunner(object):
         try:
             os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
         except:
-            logger.debug("Failed to kill browser processes")
+            logger.debug("Failed to kill chrome processes")
 
         # Empty the user data directory
         try:
             shutil.rmtree(self.tmp_path)
         except:
-            logger.debug("Failed to delete temp folder")
+            logger.debug(f"Failed to delete user-data-dir: {self.tmp_path}")
 
 
     async def launch(self, chrome_path=CHROME_PATH):
@@ -246,8 +246,7 @@ class ChromeDevTools(Devtools):
 
         await self.send(command)
 
-        response = await result_future
-        return response
+        return await result_future
 
 
 class ChromeDevToolsTarget(Devtools):
@@ -256,11 +255,11 @@ class ChromeDevToolsTarget(Devtools):
         super().__init__()
 
         self.devtools = devtools
+        self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
+
         self.session = session
 
         populate_domains(self, self.devtools.protocol["domains"])
-
-        self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
 
 
     async def execute_method(self, method, **kwargs):
@@ -271,5 +270,4 @@ class ChromeDevToolsTarget(Devtools):
 
         await self.devtools.Target.sendMessageToTarget(json.dumps(command), self.session)
 
-        response = await result_future
-        return response
+        return await result_future
