@@ -110,6 +110,9 @@ class ChromeRunner(object):
 
 
 def create_signature(params):
+    """
+        Creates a function signature based on protocol parameters
+    """
     new_params = []
 
     for param in params:
@@ -134,6 +137,11 @@ class DomainProxy(object):
 
 
 def wrap_factory(command_name, signature):
+    """
+        Returns a function that will validate its arguments against <signature>
+         and attempt to execute the command
+    """
+
     async def wrapper(self, *args, **kwargs):
         bound = signature.bind(*args, **kwargs)
         kwargs = bound.arguments
@@ -143,12 +151,21 @@ def wrap_factory(command_name, signature):
 
 
 def populate_domains(obj, domains):
+    """
+        Add domains and methods to obj (ex: obj.Page, obj.Network)
+
+        DomainProxy is the template for all domains
+        wrap_factory is used to generate the methods
+    """
+
     for domain in domains:
+        # Create a new class for each domain with the correct name
         domain_class = types.new_class(domain["domain"], (DomainProxy, ))
         new_instance = domain_class(obj)
         for command in domain.get("commands", []):
             method_sig = create_signature(command.get("parameters", []))
-            new_method = types.MethodType(wrap_factory(command["name"], method_sig), new_instance)
+            new_fn = wrap_factory(command["name"], method_sig)
+            new_method = types.MethodType(new_fn, new_instance)
             setattr(new_instance, command["name"], new_method)
 
         setattr(obj, domain["domain"], new_instance)
