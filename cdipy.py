@@ -71,25 +71,6 @@ def wrap_factory(command_name, signature):
     return wrapper
 
 
-def populate_domains(obj, domains):
-    """
-        Add domains and methods to obj (ex: obj.Page, obj.Page.enable)
-
-        DomainProxy is the template for all domains
-        wrap_factory is used to generate the methods
-    """
-
-    for domain in domains:
-        # Create a new class for each domain with the correct name
-        domain_class = types.new_class(domain["domain"], (DomainProxy, ))
-        new_instance = domain_class(obj)
-        for command in domain.get("commands", []):
-            method_sig = create_signature(command.get("parameters", []))
-            new_fn = wrap_factory(command["name"], method_sig)
-            new_method = types.MethodType(new_fn, new_instance)
-            setattr(new_instance, command["name"], new_method)
-
-        setattr(obj, domain["domain"], new_instance)
 
 
 class Devtools(EventEmitter):
@@ -143,6 +124,41 @@ class Devtools(EventEmitter):
             raise Exception(f"Unknown message format: {message}")
 
 
+    async def execute_method(self, method, **kwargs):
+        """
+            Called by the wrap_factory wrapper with the method name and validated arguments
+        """
+        command = self.format_command(method, **kwargs)
+
+        result_future = self.loop.create_future()
+        self.future_map[command["id"]] = result_future
+
+        await self.send(command)
+
+        return await result_future
+
+
+    def populate_domains(self):
+        """
+            Add domains and methods to self (ex: self.Page, self.Page.enable)
+
+            DomainProxy is the template for all domains
+            wrap_factory is used to generate the methods
+        """
+
+        for domain in self.domains:
+            # Create a new class for each domain with the correct name
+            domain_class = types.new_class(domain["domain"], (DomainProxy, ))
+            new_instance = domain_class(self)
+            for command in domain.get("commands", []):
+                method_sig = create_signature(command.get("parameters", []))
+                new_fn = wrap_factory(command["name"], method_sig)
+                new_method = types.MethodType(new_fn, new_instance)
+                setattr(new_instance, command["name"], new_method)
+
+            setattr(self, domain["domain"], new_instance)
+
+
 class ChromeDevTools(Devtools):
 
     def __init__(self, websocket_uri, domains):
@@ -151,7 +167,7 @@ class ChromeDevTools(Devtools):
         self.ws_uri = websocket_uri
         self.domains = domains
 
-        populate_domains(self, self.domains)
+        self.populate_domains()
 
 
     async def connect(self):
@@ -178,16 +194,6 @@ class ChromeDevTools(Devtools):
         await self.websocket.send(json.dumps(command))
 
 
-    async def execute_method(self, method, **kwargs):
-        command = self.format_command(method, **kwargs)
-
-        result_future = self.loop.create_future()
-        self.future_map[command["id"]] = result_future
-
-        await self.send(command)
-
-        return await result_future
-
 
 class ChromeDevToolsTarget(Devtools):
 
@@ -199,7 +205,8 @@ class ChromeDevToolsTarget(Devtools):
 
         self.session = session
 
-        populate_domains(self, self.devtools.domains)
+        self.domains = self.devtools.domains
+        self.populate_domains()
 
 
     async def _target_recv(self, sessionId, message, targetId=None):
@@ -210,6 +217,11 @@ class ChromeDevToolsTarget(Devtools):
 
 
     async def execute_method(self, method, **kwargs):
+        """
+            Target commands are in the same format, but sent as a parameter to
+            the sendMessageToTarget method
+        """
+
         command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
