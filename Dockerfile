@@ -14,17 +14,16 @@ RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - 
 
 # Python layer
 RUN pip install --upgrade pip \
-&& pip install pyee requests setuptools ujson websockets==6.0
-
-COPY . /opt/cdipy
-WORKDIR /opt/cdipy
-RUN python setup.py install
+&& pip install pyee requests setuptools ujson websockets==6.0 aiohttp==3.5.1
 
 # Making non-root user for chrome
 RUN useradd -ms /bin/bash user
 RUN mkdir -p /opt/cdipy
 RUN chown -R user /opt/cdipy
 
+COPY . /opt/cdipy
+WORKDIR /opt/cdipy
 USER user
+RUN python setup.py install --user
 
 CMD ["bash"]

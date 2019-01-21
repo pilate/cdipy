@@ -11,8 +11,7 @@ import tempfile
 
 
 
-logger = logging.getLogger("cdipy.chrome")
-logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_ARGS = [
@@ -83,7 +82,8 @@ class ChromeRunner(object):
         if self.proxy:
             command += [f"--proxy-server={self.proxy}"]
 
-        self.proc = await asyncio.create_subprocess_exec(*command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+        self.proc = await asyncio.create_subprocess_exec(*command, 
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
         self.proc_pid = self.proc.pid
 
         output = ""

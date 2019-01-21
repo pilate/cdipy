@@ -14,27 +14,14 @@ from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
 
-logger = logging.getLogger("cdipy.scripts.test")
-logger.setLevel(10)
-logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
  
 
 async def main():
-
-    domains = []
-    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json").json()
-    domains += protocol["domains"]
-
-    protocol = requests.get("https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json").json()
-    domains += protocol["domains"]
-    
-    logger.debug("Generating objects for protocol version {0}.{1}".format(
-        protocol["version"]["major"], protocol["version"]["minor"]))
-
     chrome = ChromeRunner()
     await chrome.launch()
     
-    cdi = ChromeDevTools(chrome.websocket_uri, domains)
+    cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
 
     target = await cdi.Target.createTarget("about:blank")

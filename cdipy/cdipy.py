@@ -19,15 +19,49 @@ try:
 except:
     import json
 
+import aiohttp
 import websockets
 
 
 
-logger = logging.getLogger("cdipy.cdipy")
-logging.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=logging.DEBUG)
-
+logging.basicConfig(format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG)
 logging.getLogger("websockets").setLevel(logging.ERROR)
 
+logger = logging.getLogger(__name__)
+
+
+SOURCE_FILES = [
+    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json",
+    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json"
+]
+
+CACHE_FOLDER_DEFAULT = os.path.join(os.path.dirname(__file__), '.cache/')
+CACHE_FOLDER = Path(os.path.expanduser(os.environ.get("PROTOCOL_CACHE", CACHE_FOLDER_DEFAULT)))
+
+
+async def download_data():
+    async with aiohttp.ClientSession() as session:
+        requests = []
+        for url in SOURCE_FILES:
+            logger.debug(f"Downloading {url}")
+            requests.append(session.get(url))
+
+        responses = await asyncio.gather(*requests)
+        for response in responses:
+            new_path = CACHE_FOLDER / response.url.name
+            open(new_path, "w+b").write(await response.read())
+            logger.debug(f"Wrote {new_path}")
+            
+if not os.path.exists(CACHE_FOLDER):
+    os.mkdir(CACHE_FOLDER, mode=0o744)
+
+if not os.listdir(CACHE_FOLDER):
+    asyncio.get_event_loop().run_until_complete(download_data())
+
+DOMAINS = []
+for filename in os.listdir(CACHE_FOLDER):
+    data = json.load(open(CACHE_FOLDER / filename, "rb"))
+    DOMAINS += data.get("domains", [])
 
 
 def create_signature(params):
@@ -85,8 +119,8 @@ class Devtools(EventEmitter):
 
         self.future_map = {}
         self.command_id = random.randint(0, 2**16)
-        self.domains = []
 
+        self.populate_domains()
         self.loop = asyncio.get_event_loop()
 
 
@@ -94,7 +128,7 @@ class Devtools(EventEmitter):
         """
             Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
         """
-        for domain in self.domains:
+        for domain in DOMAINS:
             # Create a new class for each domain with the correct name
             domain_class = types.new_class(domain["domain"], (DomainProxy, ))
             new_instance = domain_class(self)
@@ -161,12 +195,10 @@ class Devtools(EventEmitter):
 
 class ChromeDevTools(Devtools):
 
-    def __init__(self, websocket_uri, domains):
+    def __init__(self, websocket_uri):
         super().__init__()
 
         self.ws_uri = websocket_uri
-        self.domains = domains
-        self.populate_domains()
 
 
     async def connect(self):
@@ -202,9 +234,6 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
 
         self.session = session
-
-        self.domains = self.devtools.domains
-        self.populate_domains()
 
 
     async def _target_recv(self, sessionId, message, targetId=None):
