@@ -1,13 +1,6 @@
-from functools import wraps
-from types import MethodType
-
 import asyncio
 import base64
-import inspect
 import logging
-import types
-
-import requests
 
 from cdipy import ChromeDevTools
 from cdipy import ChromeDevToolsTarget
@@ -31,14 +24,15 @@ async def main():
     print(f"Session: {session}")
 
     cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
+    await cdit.wait_for("Page.loadEventFired")
 
-    await asyncio.gather(
-        cdit.Network.enable(),
-        cdit.Page.enable(),
-        cdit.Runtime.enable(),
-        cdit.Debugger.enable(),
-        cdit.Security.enable(),
-        cdit.Page.setDownloadBehavior(behavior="allow", downloadPath=str(chrome.tmp_path)))
+    # await asyncio.gather(
+    #     cdit.Network.enable(),
+    #     cdit.Page.enable(),
+    #     cdit.Runtime.enable(),
+    #     cdit.Debugger.enable(),
+    #     cdit.Security.enable(),
+    #     cdit.Page.setDownloadBehavior(behavior="allow", downloadPath=str(chrome.tmp_path)))
 
     # await asyncio.gather(
     #     cdit.Animation.enable(),
@@ -73,7 +67,7 @@ async def main():
     await cdit.Emulation.setDeviceMetricsOverride(width=1024, height=768, deviceScaleFactor=0, mobile=False)
     await cdit.Network.setUserAgentOverride(userAgent="Definitely not headless Chrome")
    
-    await cdit.Page.navigate("https://ultramusicfestival.com/")
+    await cdit.Page.navigate("https://google.com/")
 
     await asyncio.sleep(10)
 
