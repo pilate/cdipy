@@ -124,6 +124,19 @@ class Devtools(EventEmitter):
         self.loop = asyncio.get_event_loop()
 
 
+    def wait_for(self, event):
+        """
+            Wait for a specific event to fire before returning
+        """
+        future = asyncio.get_event_loop().create_future()
+        
+        def update_future(*args, **kwargs):
+            future.set_result((args, kwargs))
+
+        self.once(event, update_future)
+        return future
+
+
     def populate_domains(self):
         """
             Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
