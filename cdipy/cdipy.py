@@ -25,8 +25,6 @@ import websockets
 
 
 logging.basicConfig(format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG)
-logging.getLogger("websockets").setLevel(logging.ERROR)
-
 logger = logging.getLogger(__name__)
 
 

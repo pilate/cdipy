@@ -8,14 +8,15 @@ from cdipy import ChromeRunner
 
 
 logger = logging.getLogger(__name__)
- 
+logging.getLogger("websockets").setLevel(logging.ERROR)
+
 
 async def main():
     # Start Chrome
     chrome = ChromeRunner()
     await chrome.launch()
     
-    # Connect to Chrome
+    # Connect to devtools websocket
     cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
 
