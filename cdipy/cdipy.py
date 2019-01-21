@@ -124,7 +124,7 @@ class Devtools(EventEmitter):
         self.loop = asyncio.get_event_loop()
 
 
-    def wait_for(self, event):
+    def wait_for(self, event, timeout=0):
         """
             Wait for a specific event to fire before returning
         """
@@ -134,7 +134,10 @@ class Devtools(EventEmitter):
             future.set_result((args, kwargs))
 
         self.once(event, update_future)
-        return future
+        if timeout:
+            return asyncio.wait_for(future, timeout)
+        else:
+            return future
 
 
     def populate_domains(self):
