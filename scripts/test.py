@@ -8,7 +8,8 @@ from cdipy import ChromeRunner
 
 
 logger = logging.getLogger(__name__)
- 
+logging.getLogger("websockets").setLevel(logging.ERROR)
+
 
 async def main():
     chrome = ChromeRunner()
