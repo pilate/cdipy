@@ -80,6 +80,8 @@ def create_signature(params):
 
         new_params.append(new_param)   
 
+    new_params.sort(key=lambda p: bool(p.default), reverse=True)
+
     return inspect.Signature(parameters=new_params)
 
 
