@@ -224,7 +224,7 @@ class ChromeDevTools(Devtools):
 
 
     def __del__(self):
-        if hasatttr(self, 'task'):
+        if hasattr(self, 'task'):
             self.task.cancel()
 
 
