@@ -12,7 +12,7 @@ import signal
 import tempfile
 import types
 
-from pyee import EventEmitter
+from pyee import AsyncIOEventEmitter
 
 try:
     import ujson as json
@@ -49,7 +49,7 @@ async def download_data():
             new_path = CACHE_FOLDER / response.url.name
             open(new_path, "w+b").write(await response.read())
             logger.debug(f"Wrote {new_path}")
-            
+
 if not os.path.exists(CACHE_FOLDER):
     os.mkdir(CACHE_FOLDER, mode=0o744)
 
@@ -74,11 +74,11 @@ def create_signature(params):
             default = None
 
         new_param = inspect.Parameter(
-            name=param["name"], 
+            name=param["name"],
             kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
             default=default)
 
-        new_params.append(new_param)   
+        new_params.append(new_param)
 
     new_params.sort(key=lambda p: bool(p.default), reverse=True)
 
@@ -98,7 +98,7 @@ def wrap_factory(command_name, signature):
     """
         Creates a new function that can be used as a domain method
     """
-    
+
     async def wrapper(self, *args, **kwargs):
         """
             - Validate method arguments against <signature>
@@ -112,7 +112,7 @@ def wrap_factory(command_name, signature):
     return wrapper
 
 
-class Devtools(EventEmitter):
+class Devtools(AsyncIOEventEmitter):
 
     def __init__(self):
         super().__init__()
@@ -129,7 +129,7 @@ class Devtools(EventEmitter):
             Wait for a specific event to fire before returning
         """
         future = asyncio.get_event_loop().create_future()
-        
+
         def update_future(*args, **kwargs):
             future.set_result((args, kwargs))
 
@@ -218,9 +218,14 @@ class ChromeDevTools(Devtools):
 
 
     async def connect(self):
-        self.websocket = await websockets.client.connect(self.ws_uri, 
+        self.websocket = await websockets.client.connect(self.ws_uri,
             max_size=2**32, read_limit=2**32, max_queue=2**32)
         self.task = asyncio.ensure_future(self._recv_loop())
+
+
+    def __del__(self):
+        if hasatttr(self, 'task'):
+            self.task.cancel()
 
 
     async def _recv_loop(self):
