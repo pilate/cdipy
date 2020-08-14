@@ -15,9 +15,12 @@ import types
 from pyee import AsyncIOEventEmitter
 
 try:
-    import ujson as json
+    import simdjson as json
 except:
-    import json
+    try:
+        import ujson as json
+    except:
+        import json
 
 import aiohttp
 import websockets
