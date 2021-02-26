@@ -5,7 +5,7 @@ setup(
     version="0.1",
     packages=find_packages(),
     install_requires=[
-        "aiohttp==3.5.1", 
+        "aiohttp==3.7.4", 
         "pyee==5.0.0",
         "websockets==6.0"
     ],
