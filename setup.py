@@ -5,9 +5,9 @@ setup(
     version="0.1",
     packages=find_packages(),
     install_requires=[
-        "aiohttp==3.5.1", 
+        "aiohttp<3.8.0",
         "pyee==7.0.2",
-        "websockets==8.1"
+        "websockets<8.2"
     ],
     author="Pilate",
     author_email="Pilate@pilate.es",
