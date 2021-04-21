@@ -14,7 +14,7 @@ RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - 
 
 # Python layer
 RUN pip install --upgrade pip \
-&& pip install pyee requests setuptools ujson websockets==8.1 aiohttp==3.5.1
+pip install pyee==5.0.0 requests setuptools ujson pysimdjson websockets=8.1 aiohttp==3.5.1
 
 # Making non-root user for chrome
 RUN useradd -ms /bin/bash user
