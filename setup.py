@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "aiohttp<3.8.0",
-        "pyee==7.0.2",
+        "pyee<9.0.0",
         "websockets<8.2"
     ],
     author="Pilate",
