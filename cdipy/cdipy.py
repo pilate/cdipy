@@ -215,6 +215,10 @@ class Devtools(EventEmitter):
         return await result_future
 
 
+    async def send(self, command):
+        raise NotImplementedError
+
+
 class ChromeDevTools(Devtools):
 
     def __init__(self, websocket_uri):
