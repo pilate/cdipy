@@ -48,6 +48,10 @@ CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
+class ChromeClosedException(Exception):
+    pass
+
+
 class ChromeRunner(object):
 
     def __init__(self, proxy=None, tmp_path=None):
@@ -87,7 +91,7 @@ class ChromeRunner(object):
         if self.proxy:
             command += [f"--proxy-server={self.proxy}"]
 
-        self.proc = await asyncio.create_subprocess_exec(*command, 
+        self.proc = await asyncio.create_subprocess_exec(*command,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
         self.proc_pid = self.proc.pid
 
@@ -95,7 +99,7 @@ class ChromeRunner(object):
         while True:
             if self.proc.returncode is not None:
                 stderr = await self.proc.stdout.read()
-                raise Exception(f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
+                raise ChromeClosedException(f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
 
             data = await self.proc.stdout.readline()
             output += data.decode()

@@ -115,6 +115,14 @@ def wrap_factory(command_name, signature):
     return wrapper
 
 
+class ResponseErrorException(Exception):
+    pass
+
+
+class UnknownMessageException(Exception):
+    pass
+
+
 class Devtools(EventEmitter):
 
     def __init__(self):
@@ -187,7 +195,7 @@ class Devtools(EventEmitter):
 
             future = self.future_map.pop(message["id"])
             if "error" in message:
-                future.set_exception(Exception(message["error"]["message"]))
+                future.set_exception(ResponseErrorException(message["error"]["message"]))
             else:
                 future.set_result(message["result"])
 
@@ -195,7 +203,7 @@ class Devtools(EventEmitter):
             self.emit(message["method"], **message["params"])
 
         else:
-            raise Exception(f"Unknown message format: {message}")
+            raise UnknownMessageException(f"Unknown message format: {message}")
 
 
     async def execute_method(self, method, **kwargs):
