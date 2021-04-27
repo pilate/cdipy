@@ -264,7 +264,7 @@ class ChromeDevToolsTarget(Devtools):
         self.session = session
 
 
-    async def _target_recv(self, sessionId, message):
+    async def _target_recv(self, sessionId, message, **kwargs):
         if sessionId != self.session:
             return
 
