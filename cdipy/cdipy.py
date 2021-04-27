@@ -1,25 +1,20 @@
 from pathlib import Path
 
 import asyncio
-import asyncio.subprocess as subprocess
 import inspect
 import logging
 import os
 import random
-import re
-import shutil
-import signal
-import tempfile
 import types
 
 from pyee import EventEmitter
 
 try:
     import simdjson as json
-except:
+except ModuleNotFoundError:
     try:
         import ujson as json
-    except:
+    except ModuleNotFoundError:
         import json
 
 import aiohttp
@@ -88,7 +83,7 @@ def create_signature(params):
     return inspect.Signature(parameters=new_params)
 
 
-class DomainProxy(object):
+class DomainProxy:
     """
         Template class used for domains (ex: obj.Page)
     """
@@ -147,8 +142,8 @@ class Devtools(EventEmitter):
         self.once(event, update_future)
         if timeout:
             return asyncio.wait_for(future, timeout)
-        else:
-            return future
+
+        return future
 
 
     def populate_domains(self):
@@ -225,6 +220,8 @@ class ChromeDevTools(Devtools):
     def __init__(self, websocket_uri):
         super().__init__()
 
+        self.task = None
+        self.websocket = None
         self.ws_uri = websocket_uri
 
 
@@ -263,7 +260,7 @@ class ChromeDevToolsTarget(Devtools):
         self.session = session
 
 
-    async def _target_recv(self, sessionId, message, targetId=None):
+    async def _target_recv(self, sessionId, message):
         if sessionId != self.session:
             return
 
