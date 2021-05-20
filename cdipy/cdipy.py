@@ -7,7 +7,7 @@ import os
 import random
 import types
 
-from pyee import EventEmitter
+from pyee import AsyncIOEventEmitter
 
 try:
     import simdjson as json
@@ -118,7 +118,7 @@ class UnknownMessageException(Exception):
     pass
 
 
-class Devtools(EventEmitter):
+class Devtools(AsyncIOEventEmitter):
 
     def __init__(self):
         super().__init__()
@@ -233,6 +233,11 @@ class ChromeDevTools(Devtools):
         self.websocket = await websockets.client.connect(self.ws_uri,
             max_size=2**32, read_limit=2**32, max_queue=2**32)
         self.task = asyncio.ensure_future(self._recv_loop())
+
+
+    def __del__(self):
+        if hasattr(self, 'task'):
+            self.task.cancel()
 
 
     async def _recv_loop(self):
