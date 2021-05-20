@@ -48,7 +48,11 @@ CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
-class ChromeRunner(object):
+class ChromeClosedException(Exception):
+    pass
+
+
+class ChromeRunner:
 
     def __init__(self, proxy=None, tmp_path=None):
         super().__init__()
@@ -60,22 +64,22 @@ class ChromeRunner(object):
         else:
             self.tmp_path = Path(tempfile.mkdtemp())
 
+        self.proc = None
+        self.proc_pid = None
         self.websocket_uri = None
 
 
     # Browser cleanup
     def __del__(self):
-         # Kill chrome and all of its child processes
+        # Kill chrome and all of its child processes
         try:
             os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
-        except:
-            logger.debug("Failed to kill chrome processes")
+
+        except ProcessLookupError:
+            pass
 
         # Empty the user data directory
-        try:
-            shutil.rmtree(self.tmp_path)
-        except:
-            logger.debug(f"Failed to delete user-data-dir: {self.tmp_path}")
+        shutil.rmtree(self.tmp_path, ignore_errors=True)
 
 
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
@@ -87,7 +91,7 @@ class ChromeRunner(object):
         if self.proxy:
             command += [f"--proxy-server={self.proxy}"]
 
-        self.proc = await asyncio.create_subprocess_exec(*command, 
+        self.proc = await asyncio.create_subprocess_exec(*command,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
         self.proc_pid = self.proc.pid
 
@@ -95,7 +99,8 @@ class ChromeRunner(object):
         while True:
             if self.proc.returncode is not None:
                 stderr = await self.proc.stdout.read()
-                raise Exception(f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
+                raise ChromeClosedException(
+                    f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
 
             data = await self.proc.stdout.readline()
             output += data.decode()
