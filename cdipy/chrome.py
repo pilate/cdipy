@@ -72,11 +72,12 @@ class ChromeRunner:
     # Browser cleanup
     def __del__(self):
         # Kill chrome and all of its child processes
-        try:
-            os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
+        if self.proc_pid:
+            try:
+                os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
 
-        except ProcessLookupError:
-            pass
+            except ProcessLookupError:
+                pass
 
         # Empty the user data directory
         shutil.rmtree(self.tmp_path, ignore_errors=True)
