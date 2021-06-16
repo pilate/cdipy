@@ -7,7 +7,7 @@ setup(
     install_requires=[
         "aiohttp<3.8.0",
         "pyee<9.0.0",
-        "websockets<8.2"
+        "websockets<10.0"
     ],
     author="Pilate",
     author_email="Pilate@pilate.es",
