@@ -189,10 +189,11 @@ class Devtools(AsyncIOEventEmitter):
                 return
 
             future = self.future_map.pop(message["id"])
-            if "error" in message:
-                future.set_exception(ResponseErrorException(message["error"]["message"]))
-            else:
-                future.set_result(message["result"])
+            if not future.done():
+                if "error" in message:
+                    future.set_exception(ResponseErrorException(message["error"]["message"]))
+                else:
+                    future.set_result(message["result"])
 
         elif "method" in message:
             self.emit(message["method"], **message["params"])
