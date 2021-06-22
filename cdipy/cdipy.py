@@ -34,6 +34,8 @@ SOURCE_FILES = [
 CACHE_FOLDER_DEFAULT = os.path.join(os.path.dirname(__file__), '.cache/')
 CACHE_FOLDER = Path(os.path.expanduser(os.environ.get("PROTOCOL_CACHE", CACHE_FOLDER_DEFAULT)))
 
+MAX_INT = (2 ** 31) - 1
+
 
 async def download_data():
     async with aiohttp.ClientSession() as session:
@@ -235,8 +237,8 @@ class ChromeDevTools(Devtools):
             self.ws_uri,
             max_queue=None,
             max_size=None,
-            read_limit=2**32,
-            write_limit=2**32,
+            read_limit=MAX_INT,
+            write_limit=MAX_INT,
             ping_interval=None)
         self.task = asyncio.ensure_future(self._recv_loop())
 
