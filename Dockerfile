@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM python:3.8-slim-buster
 
 # Chrome requirements
 RUN apt-get update \
@@ -16,7 +16,7 @@ RUN apt-get install -y --no-install-recommends wget gnupg2 \
 
 # Python layer
 RUN pip install --upgrade pip \
-&& pip install 'pyee<9.0.0' requests setuptools ujson pysimdjson 'websockets<10.0' 'aiohttp<3.8.0'
+&& pip install 'pyee<9.0.0' requests setuptools orjson 'websockets<=10.1' 'aiohttp<3.9.0'
 
 # Making non-root user for chrome
 RUN useradd -ms /bin/bash user

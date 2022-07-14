@@ -1,7 +1,7 @@
+from asyncio import subprocess
 from pathlib import Path
 
 import asyncio
-import asyncio.subprocess as subprocess
 import logging
 import os
 import re
@@ -112,4 +112,4 @@ class ChromeRunner:
                 break
 
         self.websocket_uri = search.group(1).strip()
-        logger.info(f"Parsed websocket URI: {self.websocket_uri}")
+        logger.info("Parsed websocket URI: %s", self.websocket_uri)
