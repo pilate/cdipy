@@ -53,7 +53,7 @@ def get_cache_folder():
     if xdg_cache_home:
         return os.path.join(xdg_cache_home, "python-cdipy")
 
-    return os.path.join(os.path.dirname(__file__), ".cache/")
+    return os.path.join(os.path.dirname(__file__), ".cache")
 
 
 async def download_data():
