@@ -9,57 +9,85 @@ import types
 
 from pyee import AsyncIOEventEmitter
 
-try:
-    import simdjson as json
-except ModuleNotFoundError:
-    try:
-        import ujson as json
-    except ModuleNotFoundError:
-        import json
-
 import aiohttp
 import websockets
 
+
+try:
+    from orjson import loads
+    from orjson import dumps as _dumps
+    dumps = lambda d: _dumps(d).decode("utf-8")
+except ModuleNotFoundError:
+    try:
+        from ujson import loads
+        from ujson import dumps
+    except ModuleNotFoundError:
+        from json import loads
+        from json import dumps
 
 
 logging.basicConfig(format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
+DL_ROOT = "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json"
 SOURCE_FILES = [
-    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json",
-    "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json"
+    f"{DL_ROOT}/browser_protocol.json",
+    f"{DL_ROOT}/js_protocol.json"
 ]
 
-CACHE_FOLDER_DEFAULT = os.path.join(os.path.dirname(__file__), '.cache/')
-CACHE_FOLDER = Path(os.path.expanduser(os.environ.get("PROTOCOL_CACHE", CACHE_FOLDER_DEFAULT)))
-
 MAX_INT = (2 ** 31) - 1
+
+
+def get_cache_folder():
+    cache_dir = os.environ.get("CDIPY_CACHE")
+    if cache_dir:
+        return cache_dir
+
+    xdg_cache_home = os.getenv("XDG_CACHE_HOME")
+    if not xdg_cache_home:
+        user_home = os.getenv("HOME")
+        if user_home:
+            xdg_cache_home = os.path.join(user_home, ".cache")
+
+    if xdg_cache_home:
+        return os.path.join(xdg_cache_home, "python-cdipy")
+
+    return os.path.join(os.path.dirname(__file__), ".cache/")
 
 
 async def download_data():
     async with aiohttp.ClientSession() as session:
         requests = []
         for url in SOURCE_FILES:
-            logger.debug(f"Downloading {url}")
+            logger.debug("Downloading %s", url)
             requests.append(session.get(url))
 
         responses = await asyncio.gather(*requests)
         for response in responses:
             new_path = CACHE_FOLDER / response.url.name
-            open(new_path, "w+b").write(await response.read())
-            logger.debug(f"Wrote {new_path}")
+            with open(new_path, "w+b") as f:
+                f.write(await response.read())
+            logger.debug("Wrote %s", new_path)
 
+
+CACHE_FOLDER = Path(get_cache_folder())
 if not os.path.exists(CACHE_FOLDER):
-    os.mkdir(CACHE_FOLDER, mode=0o744)
+    os.makedirs(CACHE_FOLDER, mode=0o744)
 
 if not os.listdir(CACHE_FOLDER):
     asyncio.get_event_loop().run_until_complete(download_data())
 
-DOMAINS = []
-for filename in os.listdir(CACHE_FOLDER):
-    data = json.load(open(CACHE_FOLDER / filename, "rb"))
-    DOMAINS += data.get("domains", [])
+
+def get_domains():
+    domains = []
+    for filename in os.listdir(CACHE_FOLDER):
+        with open(CACHE_FOLDER / filename, "rb") as f:
+            data = loads(f.read())
+        domains += data.get("domains", [])
+    return domains
+
+DOMAINS = get_domains()
 
 
 def create_signature(params):
@@ -184,7 +212,7 @@ class Devtools(AsyncIOEventEmitter):
             Match incoming message ids against our dict of pending futures
             Emit events for incomming methods
         """
-        message = json.loads(message)
+        message = loads(message)
 
         if "id" in message:
             if message["id"] not in self.future_map:
@@ -252,7 +280,7 @@ class ChromeDevTools(Devtools):
         while True:
             try:
                 recv_data = await self.websocket.recv()
-                logger.debug(f"recv: {recv_data}")
+                logger.debug("recv: %s", recv_data)
 
             except websockets.exceptions.ConnectionClosed:
                 logger.error("Websocket connection closed")
@@ -262,8 +290,8 @@ class ChromeDevTools(Devtools):
 
 
     async def send(self, command):
-        logger.debug(f"send: {command}")
-        await self.websocket.send(json.dumps(command))
+        logger.debug("send: %s", command)
+        await self.websocket.send(dumps(command))
 
 
 class ChromeDevToolsTarget(Devtools):
@@ -277,7 +305,7 @@ class ChromeDevToolsTarget(Devtools):
         self.session = session
 
 
-    async def _target_recv(self, sessionId, message, **kwargs):
+    async def _target_recv(self, sessionId, message, **_):
         if sessionId != self.session:
             return
 
@@ -294,6 +322,6 @@ class ChromeDevToolsTarget(Devtools):
         result_future = self.loop.create_future()
         self.future_map[command["id"]] = result_future
 
-        await self.devtools.Target.sendMessageToTarget(json.dumps(command), self.session)
+        await self.devtools.Target.sendMessageToTarget(dumps(command), self.session)
 
         return await result_future
