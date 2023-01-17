@@ -1,17 +1,15 @@
-from pathlib import Path
-
 import asyncio
 import inspect
 import logging
 import os
 import random
 import types
+from pathlib import Path
 
+import websockets
 from pyee import AsyncIOEventEmitter
 
-import aiohttp
-import websockets
-
+from cdipy.utils import download_data, get_cache_path
 
 try:
     from orjson import loads
@@ -26,68 +24,10 @@ except ModuleNotFoundError:
         from json import dumps
 
 
-logging.basicConfig(format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("cdipy.cdipy")
 
-
-DL_ROOT = "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json"
-SOURCE_FILES = [
-    f"{DL_ROOT}/browser_protocol.json",
-    f"{DL_ROOT}/js_protocol.json"
-]
-
-MAX_INT = (2 ** 31) - 1
-
-
-def get_cache_folder():
-    cache_dir = os.environ.get("CDIPY_CACHE")
-    if cache_dir:
-        return cache_dir
-
-    xdg_cache_home = os.getenv("XDG_CACHE_HOME")
-    if not xdg_cache_home:
-        user_home = os.getenv("HOME")
-        if user_home:
-            xdg_cache_home = os.path.join(user_home, ".cache")
-
-    if xdg_cache_home:
-        return os.path.join(xdg_cache_home, "python-cdipy")
-
-    return os.path.join(os.path.dirname(__file__), ".cache")
-
-
-async def download_data():
-    async with aiohttp.ClientSession() as session:
-        requests = []
-        for url in SOURCE_FILES:
-            logger.debug("Downloading %s", url)
-            requests.append(session.get(url))
-
-        responses = await asyncio.gather(*requests)
-        for response in responses:
-            new_path = CACHE_FOLDER / response.url.name
-            with open(new_path, "w+b") as f:
-                f.write(await response.read())
-            logger.debug("Wrote %s", new_path)
-
-
-CACHE_FOLDER = Path(get_cache_folder())
-if not os.path.exists(CACHE_FOLDER):
-    os.makedirs(CACHE_FOLDER, mode=0o744)
-
-if not os.listdir(CACHE_FOLDER):
-    asyncio.get_event_loop().run_until_complete(download_data())
-
-
-def get_domains():
-    domains = []
-    for filename in os.listdir(CACHE_FOLDER):
-        with open(CACHE_FOLDER / filename, "rb") as f:
-            data = loads(f.read())
-        domains += data.get("domains", [])
-    return domains
-
-DOMAINS = get_domains()
+MAX_INT = (2**31) - 1
+DOMAINS = {}
 
 
 def create_signature(params):
@@ -140,6 +80,40 @@ def wrap_factory(command_name, signature):
     return wrapper
 
 
+async def domain_setup():
+    cache_path = Path(get_cache_path())
+
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path, mode=0o744)
+
+    if not os.listdir(cache_path):
+        await download_data()
+
+    domains = []
+    for filename in os.listdir(cache_path):
+        with open(cache_path / filename, "rb") as f:
+            data = loads(f.read())
+        domains += data.get("domains", [])
+
+    for domain in domains:
+        domain_name = domain["domain"]
+        # Create a new class for each domain with the correct name
+        domain_class = types.new_class(domain_name, (DomainProxy,))
+        for command in domain.get("commands", []):
+            command_name = command["name"]
+            # Create a new class method for each domain command
+            method_sig = create_signature(command.get("parameters", []))
+            new_fn = wrap_factory(command["name"], method_sig)
+            # set name to something useful
+            new_fn.__qualname__ = f"{domain_name}.{command_name}"
+            setattr(domain_class, command_name, new_fn)
+
+        DOMAINS[domain_name] = domain_class
+
+
+asyncio.get_event_loop().run_until_complete(domain_setup())
+
+
 class ResponseErrorException(Exception):
     pass
 
@@ -164,7 +138,7 @@ class Devtools(AsyncIOEventEmitter):
         """
             Wait for a specific event to fire before returning
         """
-        future = asyncio.get_event_loop().create_future()
+        future = self.loop.create_future()
 
         def update_future(*args, **kwargs):
             future.set_result((args, kwargs))
@@ -175,24 +149,13 @@ class Devtools(AsyncIOEventEmitter):
 
         return future
 
-
     def populate_domains(self):
         """
             Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
         """
-        for domain in DOMAINS:
-            # Create a new class for each domain with the correct name
-            domain_class = types.new_class(domain["domain"], (DomainProxy, ))
+        for domain_name, domain_class in DOMAINS.items():
             new_instance = domain_class(self)
-            for command in domain.get("commands", []):
-                # Create a new method for each domain command
-                method_sig = create_signature(command.get("parameters", []))
-                new_fn = wrap_factory(command["name"], method_sig)
-                new_method = types.MethodType(new_fn, new_instance)
-                setattr(new_instance, command["name"], new_method)
-
-            setattr(self, domain["domain"], new_instance)
-
+            setattr(self, domain_name, new_instance)
 
     def format_command(self, method, **kwargs):
         """
@@ -280,17 +243,17 @@ class ChromeDevTools(Devtools):
         while True:
             try:
                 recv_data = await self.websocket.recv()
-                logger.debug("recv: %s", recv_data)
+                LOGGER.debug("recv: %s", recv_data)
 
             except websockets.exceptions.ConnectionClosed:
-                logger.error("Websocket connection closed")
+                LOGGER.error("Websocket connection closed")
                 break
 
             await self.handle_message(recv_data)
 
 
     async def send(self, command):
-        logger.debug("send: %s", command)
+        LOGGER.debug("send: %s", command)
         await self.websocket.send(dumps(command))
 
 
