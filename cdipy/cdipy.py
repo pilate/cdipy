@@ -124,14 +124,10 @@ class UnknownMessageException(Exception):
     pass
 
 
-class Devtools(AsyncIOEventEmitter):
+class DevtoolsEmitter(AsyncIOEventEmitter):
     def __init__(self):
         super().__init__()
 
-        self.future_map = {}
-        self.command_id = random.randint(0, 2**16)
-
-        self.populate_domains()
         self.loop = asyncio.get_event_loop()
 
     def wait_for(self, event, timeout=0):
@@ -149,10 +145,14 @@ class Devtools(AsyncIOEventEmitter):
 
         return future
 
-    def populate_domains(self):
-        """
-        Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
-        """
+
+class Devtools(DevtoolsEmitter):
+    def __init__(self):
+        super().__init__()
+
+        self.future_map = {}
+        self.command_id = random.randint(0, 2**16)
+
         for domain_name, domain_class in DOMAINS.items():
             new_instance = domain_class(self)
             setattr(self, domain_name, new_instance)
@@ -216,6 +216,10 @@ class ChromeDevTools(Devtools):
         self.websocket = None
         self.ws_uri = websocket_uri
 
+    def __del__(self):
+        if hasattr(self, "task"):
+            self.task.cancel()
+
     async def connect(self):
         self.websocket = await websockets.connect(
             self.ws_uri,
@@ -226,10 +230,6 @@ class ChromeDevTools(Devtools):
             ping_interval=None,
         )
         self.task = asyncio.ensure_future(self._recv_loop())
-
-    def __del__(self):
-        if hasattr(self, "task"):
-            self.task.cancel()
 
     async def _recv_loop(self):
         while True:
