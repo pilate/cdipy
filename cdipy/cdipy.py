@@ -14,6 +14,7 @@ from cdipy.utils import download_data, get_cache_path
 try:
     from orjson import loads
     from orjson import dumps as _dumps
+
     dumps = lambda d: _dumps(d).decode("utf-8")
 except ModuleNotFoundError:
     try:
@@ -32,7 +33,7 @@ DOMAINS = {}
 
 def create_signature(params):
     """
-        Creates a function signature based on a list of protocol parameters
+    Creates a function signature based on a list of protocol parameters
     """
     new_params = []
 
@@ -44,7 +45,8 @@ def create_signature(params):
         new_param = inspect.Parameter(
             name=param["name"],
             kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=default)
+            default=default,
+        )
 
         new_params.append(new_param)
 
@@ -55,7 +57,7 @@ def create_signature(params):
 
 class DomainProxy:
     """
-        Template class used for domains (ex: obj.Page)
+    Template class used for domains (ex: obj.Page)
     """
 
     def __init__(self, devtools):
@@ -64,13 +66,13 @@ class DomainProxy:
 
 def wrap_factory(command_name, signature):
     """
-        Creates a new function that can be used as a domain method
+    Creates a new function that can be used as a domain method
     """
 
     async def wrapper(self, *args, **kwargs):
         """
-            - Validate method arguments against <signature>
-            - Attempt to execute method
+        - Validate method arguments against <signature>
+        - Attempt to execute method
         """
         bound = signature.bind(*args, **kwargs)
         kwargs = bound.arguments
@@ -123,7 +125,6 @@ class UnknownMessageException(Exception):
 
 
 class Devtools(AsyncIOEventEmitter):
-
     def __init__(self):
         super().__init__()
 
@@ -133,10 +134,9 @@ class Devtools(AsyncIOEventEmitter):
         self.populate_domains()
         self.loop = asyncio.get_event_loop()
 
-
     def wait_for(self, event, timeout=0):
         """
-            Wait for a specific event to fire before returning
+        Wait for a specific event to fire before returning
         """
         future = self.loop.create_future()
 
@@ -151,7 +151,7 @@ class Devtools(AsyncIOEventEmitter):
 
     def populate_domains(self):
         """
-            Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
+        Generate domain classes (ex: self.Page) and methods (ex: self.Page.enable)
         """
         for domain_name, domain_class in DOMAINS.items():
             new_instance = domain_class(self)
@@ -159,21 +159,16 @@ class Devtools(AsyncIOEventEmitter):
 
     def format_command(self, method, **kwargs):
         """
-            Convert method name + arguments to a devtools command
+        Convert method name + arguments to a devtools command
         """
         self.command_id += 1
 
-        return {
-            "id": self.command_id,
-            "method": method,
-            "params": kwargs
-        }
-
+        return {"id": self.command_id, "method": method, "params": kwargs}
 
     async def handle_message(self, message):
         """
-            Match incoming message ids against our dict of pending futures
-            Emit events for incomming methods
+        Match incoming message ids against our dict of pending futures
+        Emit events for incomming methods
         """
         message = loads(message)
 
@@ -184,7 +179,9 @@ class Devtools(AsyncIOEventEmitter):
             future = self.future_map.pop(message["id"])
             if not future.done():
                 if "error" in message:
-                    future.set_exception(ResponseErrorException(message["error"]["message"]))
+                    future.set_exception(
+                        ResponseErrorException(message["error"]["message"])
+                    )
                 else:
                     future.set_result(message["result"])
 
@@ -194,10 +191,9 @@ class Devtools(AsyncIOEventEmitter):
         else:
             raise UnknownMessageException(f"Unknown message format: {message}")
 
-
     async def execute_method(self, method, **kwargs):
         """
-            Called by the wrap_factory wrapper with the method name and validated arguments
+        Called by the wrap_factory wrapper with the method name and validated arguments
         """
         command = self.format_command(method, **kwargs)
 
@@ -208,20 +204,17 @@ class Devtools(AsyncIOEventEmitter):
 
         return await result_future
 
-
     async def send(self, command):
         raise NotImplementedError
 
 
 class ChromeDevTools(Devtools):
-
     def __init__(self, websocket_uri):
         super().__init__()
 
         self.task = None
         self.websocket = None
         self.ws_uri = websocket_uri
-
 
     async def connect(self):
         self.websocket = await websockets.connect(
@@ -230,14 +223,13 @@ class ChromeDevTools(Devtools):
             max_size=None,
             read_limit=MAX_INT,
             write_limit=MAX_INT,
-            ping_interval=None)
+            ping_interval=None,
+        )
         self.task = asyncio.ensure_future(self._recv_loop())
 
-
     def __del__(self):
-        if hasattr(self, 'task'):
+        if hasattr(self, "task"):
             self.task.cancel()
-
 
     async def _recv_loop(self):
         while True:
@@ -251,14 +243,12 @@ class ChromeDevTools(Devtools):
 
             await self.handle_message(recv_data)
 
-
     async def send(self, command):
         LOGGER.debug("send: %s", command)
         await self.websocket.send(dumps(command))
 
 
 class ChromeDevToolsTarget(Devtools):
-
     def __init__(self, devtools, session):
         super().__init__()
 
@@ -267,18 +257,16 @@ class ChromeDevToolsTarget(Devtools):
 
         self.session = session
 
-
     async def _target_recv(self, sessionId, message, **_):
         if sessionId != self.session:
             return
 
         await self.handle_message(message)
 
-
     async def execute_method(self, method, **kwargs):
         """
-            Target commands are in the same format, but sent as a parameter to
-            the sendMessageToTarget method
+        Target commands are in the same format, but sent as a parameter to
+        the sendMessageToTarget method
         """
         command = self.format_command(method, **kwargs)
 

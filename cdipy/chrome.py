@@ -1,6 +1,3 @@
-from asyncio import subprocess
-from pathlib import Path
-
 import asyncio
 import logging
 import os
@@ -8,10 +5,11 @@ import re
 import shutil
 import signal
 import tempfile
+from asyncio import subprocess
+from pathlib import Path
 
 
-
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("cdipy.chrome")
 
 
 DEFAULT_ARGS = [
@@ -42,7 +40,7 @@ DEFAULT_ARGS = [
     "--headless",
     "--disable-gpu",
     "--hide-scrollbars",
-    "--mute-audio"
+    "--mute-audio",
 ]
 
 CHROME_PATH = "/usr/bin/google-chrome-stable"
@@ -54,7 +52,6 @@ class ChromeClosedException(Exception):
 
 
 class ChromeRunner:
-
     def __init__(self, proxy=None, tmp_path=None):
         super().__init__()
 
@@ -69,7 +66,6 @@ class ChromeRunner:
         self.proc_pid = None
         self.websocket_uri = None
 
-
     # Browser cleanup
     def __del__(self):
         # Kill chrome and all of its child processes
@@ -83,7 +79,6 @@ class ChromeRunner:
         # Empty the user data directory
         shutil.rmtree(self.tmp_path, ignore_errors=True)
 
-
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
         command = [chrome_path] + DEFAULT_ARGS + [f"--user-data-dir={self.tmp_path}"]
 
@@ -93,8 +88,12 @@ class ChromeRunner:
         if self.proxy:
             command += [f"--proxy-server={self.proxy}"]
 
-        self.proc = await asyncio.create_subprocess_exec(*command,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+        self.proc = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            preexec_fn=os.setsid,
+        )
         self.proc_pid = self.proc.pid
 
         output = ""
@@ -102,7 +101,8 @@ class ChromeRunner:
             if self.proc.returncode is not None:
                 stderr = await self.proc.stdout.read()
                 raise ChromeClosedException(
-                    f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
+                    f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})"
+                )
 
             data = await self.proc.stdout.readline()
             output += data.decode()
@@ -112,4 +112,4 @@ class ChromeRunner:
                 break
 
         self.websocket_uri = search.group(1).strip()
-        logger.info("Parsed websocket URI: %s", self.websocket_uri)
+        LOGGER.info("Parsed websocket URI: %s", self.websocket_uri)
