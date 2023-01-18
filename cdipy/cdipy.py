@@ -9,20 +9,18 @@ from itertools import count
 import websockets
 from pyee import AsyncIOEventEmitter
 
-from cdipy.utils import update_devtools_data, get_cache_path
+from cdipy.utils import get_cache_path, update_devtools_data
 
 try:
-    from orjson import loads
     from orjson import dumps as _dumps
+    from orjson import loads
 
     dumps = lambda d: _dumps(d).decode("utf-8")
 except ModuleNotFoundError:
     try:
-        from ujson import loads
-        from ujson import dumps
+        from ujson import dumps, loads
     except ModuleNotFoundError:
-        from json import loads
-        from json import dumps
+        from json import dumps, loads
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
