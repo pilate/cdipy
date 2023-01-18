@@ -9,7 +9,7 @@ from pathlib import Path
 import websockets
 from pyee import AsyncIOEventEmitter
 
-from cdipy.utils import download_data, get_cache_path
+from cdipy.utils import update_devtools_data, get_cache_path
 
 try:
     from orjson import loads
@@ -83,13 +83,13 @@ def wrap_factory(command_name, signature):
 
 
 async def domain_setup():
-    cache_path = Path(get_cache_path())
+    cache_path = get_cache_path()
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path, mode=0o744)
 
     if not os.listdir(cache_path):
-        await download_data()
+        await update_devtools_data()
 
     domains = []
     for filename in os.listdir(cache_path):
