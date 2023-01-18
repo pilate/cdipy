@@ -178,17 +178,11 @@ class Devtools(DevtoolsEmitter):
         message = loads(message)
 
         if "id" in message:
-            if message["id"] not in self.future_map:
-                return
-
             future = self.future_map.pop(message["id"])
-            if not future.done():
-                if "error" in message:
-                    future.set_exception(
-                        ResponseErrorException(message["error"]["message"])
-                    )
-                else:
-                    future.set_result(message["result"])
+            if error := message.get("error"):
+                future.set_exception(ResponseErrorException(error["message"]))
+            else:
+                future.set_result(message["result"])
 
         elif "method" in message:
             self.emit(message["method"], **message["params"])
