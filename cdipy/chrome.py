@@ -69,9 +69,9 @@ class ChromeRunner:
     # Browser cleanup
     def __del__(self):
         # Kill chrome and all of its child processes
-        if self.proc_pid:
+        if self.proc and self.proc.pid:
             try:
-                os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
+                os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
 
             except ProcessLookupError:
                 pass
@@ -94,7 +94,6 @@ class ChromeRunner:
             stderr=subprocess.STDOUT,
             preexec_fn=os.setsid,
         )
-        self.proc_pid = self.proc.pid
 
         output = ""
         while True:
