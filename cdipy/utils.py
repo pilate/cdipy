@@ -5,13 +5,11 @@ import os
 import aiohttp
 
 
-DL_ROOT = "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json"
-SOURCE_FILES = [
-    f"{DL_ROOT}/browser_protocol.json",
-    f"{DL_ROOT}/js_protocol.json"
-]
+ROOT = "https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json"
+SOURCE_FILES = [f"{ROOT}/browser_protocol.json", f"{ROOT}/js_protocol.json"]
 
 LOGGER = logging.getLogger("cdipy.utils")
+
 
 def get_cache_path():
     cache_dir = os.environ.get("CDIPY_CACHE")
