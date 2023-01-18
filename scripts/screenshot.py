@@ -43,7 +43,7 @@ async def main():
     try:
         await cdit.wait_for("Page.loadEventFired", 10)
     except asyncio.TimeoutError:
-        LOGGER.warn("Loaded event never fired")
+        LOGGER.warning("Loaded event never fired")
 
     # Take a screenshot
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
