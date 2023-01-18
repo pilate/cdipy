@@ -156,9 +156,11 @@ class Devtools(DevtoolsEmitter):
         self.future_map = {}
         self.counter = count()
 
-        for domain_name, domain_class in DOMAINS.items():
-            new_instance = domain_class(self)
-            setattr(self, domain_name, new_instance)
+    def __getattr__(self, attr):
+        if domain := DOMAINS.get(attr):
+            setattr(self, attr, domain(self))
+
+        return super().__getattribute__(attr)
 
     def format_command(self, method, **kwargs):
         """
