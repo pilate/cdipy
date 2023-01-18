@@ -36,7 +36,7 @@ async def update_devtools_data():
     async with aiohttp.ClientSession() as session:
         requests = []
         for url in SOURCE_FILES:
-            LOGGER.debug("Downloading %s", url)
+            LOGGER.warning("Downloading %s", url)
             requests.append(session.get(url))
 
         responses = await asyncio.gather(*requests)
@@ -44,4 +44,4 @@ async def update_devtools_data():
             new_path = get_cache_path() / response.url.name
             with open(new_path, "w+b") as f:
                 f.write(await response.read())
-            LOGGER.debug("Wrote %s", new_path)
+            LOGGER.warning("Wrote %s", new_path)
