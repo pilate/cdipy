@@ -61,10 +61,11 @@ def create_signature(params):
     return inspect.Signature(parameters=new_params)
 
 
-def wrap_factory(command_name, signature):
+def fn_factory(command_name, parameters):
     """
     Creates a new function that can be used as a domain method
     """
+    signature = create_signature(parameters)
 
     async def wrapper(self, *args, **kwargs):
         """
@@ -77,19 +78,6 @@ def wrap_factory(command_name, signature):
         return await self.devtools.execute_method(command, **kwargs)
 
     return wrapper
-
-
-def add_domain_command(domain_class, command):
-    command_name = command["name"]
-
-    # Create a new function for each domain command
-    method_sig = create_signature(command.get("parameters", []))
-    new_fn = wrap_factory(command_name, method_sig)
-
-    # set name to something useful
-    new_fn.__qualname__ = f"{domain_class.__name__}.{command_name}"
-
-    setattr(domain_class, command_name, new_fn)
 
 
 async def domain_setup():
@@ -114,7 +102,15 @@ async def domain_setup():
 
         # Add class methods for each domain function
         for command in domain.get("commands", []):
-            add_domain_command(domain_class, command)
+            command_name = command["name"]
+
+            # Create a new function for each domain command
+            new_fn = fn_factory(command_name, command.get("parameters", []))
+
+            # set name to something useful
+            new_fn.__qualname__ = f"{domain_name}.{command_name}"
+
+            setattr(domain_class, command_name, new_fn)
 
         DOMAINS[domain_name] = domain_class
 
@@ -192,7 +188,7 @@ class Devtools(DevtoolsEmitter):
 
     async def execute_method(self, method, **kwargs):
         """
-        Called by the wrap_factory wrapper with the method name and validated arguments
+        Called by the fn_factory wrapper with the method name and validated arguments
         """
         command = self.format_command(method, **kwargs)
 
