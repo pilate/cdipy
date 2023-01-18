@@ -7,15 +7,20 @@ from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("cdipy.scripts.screenshot")
+logging.basicConfig(
+    format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG
+)
+
 logging.getLogger("websockets").setLevel(logging.ERROR)
+logging.getLogger("cdipy").setLevel(logging.INFO)
 
 
 async def main():
     # Start Chrome
     chrome = ChromeRunner()
     await chrome.launch()
-    
+
     # Connect to devtools websocket
     cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
@@ -38,7 +43,7 @@ async def main():
     try:
         await cdit.wait_for("Page.loadEventFired", 10)
     except asyncio.TimeoutError:
-        logger.warn("Loaded event never fired")
+        LOGGER.warn("Loaded event never fired")
 
     # Take a screenshot
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
@@ -46,4 +51,4 @@ async def main():
     open("screenshot.png", "w+b").write(screenshot_bytes)
 
 
-asyncio.get_event_loop().run_until_complete(main())
+asyncio.run(main())
