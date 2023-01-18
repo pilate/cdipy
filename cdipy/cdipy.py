@@ -2,7 +2,6 @@ import asyncio
 import inspect
 import logging
 import os
-import random
 import types
 from itertools import count
 
@@ -29,6 +28,15 @@ MAX_INT = (2**31) - 1
 DOMAINS = {}
 
 
+class DomainProxy:
+    """
+    Template class used for domains (ex: obj.Page)
+    """
+
+    def __init__(self, devtools):
+        self.devtools = devtools
+
+
 def create_signature(params):
     """
     Creates a function signature based on a list of protocol parameters
@@ -53,15 +61,6 @@ def create_signature(params):
     return inspect.Signature(parameters=new_params)
 
 
-class DomainProxy:
-    """
-    Template class used for domains (ex: obj.Page)
-    """
-
-    def __init__(self, devtools):
-        self.devtools = devtools
-
-
 def wrap_factory(command_name, signature):
     """
     Creates a new function that can be used as a domain method
@@ -78,6 +77,19 @@ def wrap_factory(command_name, signature):
         return await self.devtools.execute_method(command, **kwargs)
 
     return wrapper
+
+
+def add_domain_command(domain_class, command):
+    command_name = command["name"]
+
+    # Create a new function for each domain command
+    method_sig = create_signature(command.get("parameters", []))
+    new_fn = wrap_factory(command_name, method_sig)
+
+    # set name to something useful
+    new_fn.__qualname__ = f"{domain_class.__name__}.{command_name}"
+
+    setattr(domain_class, command_name, new_fn)
 
 
 async def domain_setup():
@@ -99,14 +111,10 @@ async def domain_setup():
         domain_name = domain["domain"]
         # Create a new class for each domain with the correct name
         domain_class = types.new_class(domain_name, (DomainProxy,))
+
+        # Add class methods for each domain function
         for command in domain.get("commands", []):
-            command_name = command["name"]
-            # Create a new class method for each domain command
-            method_sig = create_signature(command.get("parameters", []))
-            new_fn = wrap_factory(command["name"], method_sig)
-            # set name to something useful
-            new_fn.__qualname__ = f"{domain_name}.{command_name}"
-            setattr(domain_class, command_name, new_fn)
+            add_domain_command(domain_class, command)
 
         DOMAINS[domain_name] = domain_class
 
