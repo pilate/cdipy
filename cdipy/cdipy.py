@@ -157,6 +157,9 @@ class Devtools(DevtoolsEmitter):
         self.counter = count()
 
     def __getattr__(self, attr):
+        """
+        Load each domain on demand
+        """
         if domain := DOMAINS.get(attr):
             setattr(self, attr, domain(self))
 
