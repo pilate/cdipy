@@ -32,6 +32,7 @@ class DomainProxy:
     """
     Template class used for domains (ex: obj.Page)
     """
+    __slots__ = ("devtools", )
 
     def __init__(self, devtools):
         self.devtools = devtools
