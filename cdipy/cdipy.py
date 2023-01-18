@@ -4,7 +4,7 @@ import logging
 import os
 import random
 import types
-from pathlib import Path
+from itertools import count
 
 import websockets
 from pyee import AsyncIOEventEmitter
@@ -151,7 +151,7 @@ class Devtools(DevtoolsEmitter):
         super().__init__()
 
         self.future_map = {}
-        self.command_id = random.randint(0, 2**16)
+        self.counter = count()
 
         for domain_name, domain_class in DOMAINS.items():
             new_instance = domain_class(self)
@@ -161,9 +161,8 @@ class Devtools(DevtoolsEmitter):
         """
         Convert method name + arguments to a devtools command
         """
-        self.command_id += 1
 
-        return {"id": self.command_id, "method": method, "params": kwargs}
+        return {"id": next(self.counter), "method": method, "params": kwargs}
 
     async def handle_message(self, message):
         """
