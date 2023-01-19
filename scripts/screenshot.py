@@ -54,7 +54,6 @@ def main():
         format="[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(funcName)s] %(message)s",
         level=logging.INFO,
     )
-    logging.getLogger("websockets").setLevel(logging.ERROR)
 
     asyncio.run(async_main(sys.argv[1]))
 
