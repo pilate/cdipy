@@ -32,7 +32,7 @@ def get_cache_path():
     return Path(full_path)
 
 
-async def update_devtools_data():
+async def update_protocol_data():
     async with aiohttp.ClientSession() as session:
         requests = []
         for url in SOURCE_FILES:

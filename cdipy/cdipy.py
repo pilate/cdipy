@@ -8,7 +8,7 @@ from itertools import count
 import websockets
 from pyee import AsyncIOEventEmitter
 
-from cdipy.utils import get_cache_path, update_devtools_data
+from cdipy.utils import get_cache_path, update_protocol_data
 
 try:
     from orjson import dumps as _dumps
@@ -92,7 +92,7 @@ async def domain_setup():
         os.makedirs(cache_path, mode=0o744)
 
     if not os.listdir(cache_path):
-        await update_devtools_data()
+        await update_protocol_data()
 
     domains = []
     for filename in os.listdir(cache_path):
