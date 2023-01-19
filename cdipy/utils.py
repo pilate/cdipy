@@ -42,6 +42,6 @@ async def update_devtools_data():
         responses = await asyncio.gather(*requests)
         for response in responses:
             new_path = get_cache_path() / response.url.name
-            with open(new_path, "w+b") as f:
+            with open(new_path, "w+b") as f:  # pylint: disable=invalid-name
                 f.write(await response.read())
             LOGGER.warning("Wrote %s", new_path)

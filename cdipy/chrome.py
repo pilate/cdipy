@@ -100,7 +100,7 @@ class ChromeRunner:
             if self.proc.returncode is not None:
                 stderr = await self.proc.stdout.read()
                 raise ChromeClosedException(
-                    f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})"
+                    f"Chrome closed unexpectedly; code: {self.proc.returncode} ({stderr})"
                 )
 
             data = await self.proc.stdout.readline()

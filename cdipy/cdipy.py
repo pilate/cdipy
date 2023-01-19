@@ -14,7 +14,10 @@ try:
     from orjson import dumps as _dumps
     from orjson import loads
 
-    dumps = lambda d: _dumps(d).decode("utf-8")
+    # orjson returns bytes
+    def dumps(data):
+        return _dumps(data).decode("utf-8")
+
 except ModuleNotFoundError:
     try:
         from ujson import dumps, loads
@@ -32,7 +35,8 @@ class DomainProxy:
     """
     Template class used for domains (ex: obj.Page)
     """
-    __slots__ = ("devtools", )
+
+    __slots__ = ("devtools",)
 
     def __init__(self, devtools):
         self.devtools = devtools
@@ -92,7 +96,7 @@ async def domain_setup():
 
     domains = []
     for filename in os.listdir(cache_path):
-        with open(cache_path / filename, "rb") as f:
+        with open(cache_path / filename, "rb") as f:  # pylint: disable=invalid-name
             data = loads(f.read())
         domains += data.get("domains", [])
 
@@ -175,7 +179,7 @@ class Devtools(DevtoolsEmitter):
     async def handle_message(self, message):
         """
         Match incoming message ids to future_map
-        Emit events for incomming methods
+        Emit events for incoming methods
         """
         message = loads(message)
 
@@ -258,7 +262,9 @@ class ChromeDevToolsTarget(Devtools):
 
         self.session = session
 
-    async def _target_recv(self, sessionId, message, **_):
+    async def _target_recv(
+        self, sessionId, message, **_
+    ):  # pylint: disable=invalid-name
         if sessionId != self.session:
             return
 
