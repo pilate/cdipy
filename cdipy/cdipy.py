@@ -6,6 +6,7 @@ import types
 from itertools import count
 
 import websockets
+import websockets.client
 from pyee import AsyncIOEventEmitter
 
 from cdipy.utils import get_cache_path, update_protocol_data
@@ -228,7 +229,7 @@ class ChromeDevTools(Devtools):
             self.task.cancel()
 
     async def connect(self):
-        self.websocket = await websockets.connect(
+        self.websocket = await websockets.client.connect(
             self.ws_uri,
             max_queue=None,
             max_size=None,
