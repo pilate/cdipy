@@ -31,7 +31,7 @@ MAX_INT = (2**31) - 1
 DOMAINS = {}
 
 
-class DomainProxy:  # pylint: disable=too-few-public-methods
+class DomainBase:  # pylint: disable=too-few-public-methods
     """
     Template class used for domains (ex: obj.Page)
     """
@@ -42,7 +42,7 @@ class DomainProxy:  # pylint: disable=too-few-public-methods
         self.devtools = devtools
 
 
-def create_signature(params):
+def params_to_signature(params):
     """
     Creates a function signature based on a list of protocol parameters
     """
@@ -70,7 +70,7 @@ def fn_factory(command_name, parameters):
     """
     Creates a new function that can be used as a domain method
     """
-    signature = create_signature(parameters)
+    signature = params_to_signature(parameters)
 
     async def wrapper(self, *args, **kwargs):
         """
@@ -103,7 +103,7 @@ def load_domains():
             domain_name = domain["domain"]
 
             # Create a new class for each domain with the correct name
-            domain_class = types.new_class(domain_name, (DomainProxy,))
+            domain_class = types.new_class(domain_name, (DomainBase,))
 
             # Add class methods for each domain function
             for command in domain.get("commands", []):
