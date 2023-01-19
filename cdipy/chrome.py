@@ -86,7 +86,7 @@ class ChromeRunner:
             command += extra_args
 
         if self.proxy:
-            command += [f"--proxy-server={self.proxy}"]
+            command.append(f"--proxy-server={self.proxy}")
 
         self.proc = await asyncio.create_subprocess_exec(
             *command,
