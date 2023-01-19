@@ -57,12 +57,13 @@ class ChromeRunner:
         self.proxy = proxy
 
         if tmp_path:
+            if not isinstance(tmp_path, Path):
+                tmp_path = Path(tmp_path)
             self.tmp_path = tmp_path
         else:
             self.tmp_path = Path(tempfile.mkdtemp())
 
         self.proc = None
-        self.proc_pid = None
         self.websocket_uri = None
 
     # Browser cleanup
