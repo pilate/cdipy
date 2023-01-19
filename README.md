@@ -8,22 +8,18 @@ Meant to serve as a pythonic version of [chrome-remote-interface](https://github
 
 import asyncio
 import base64
-import logging
 
 from cdipy import ChromeDevTools
 from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
 
-logger = logging.getLogger(__name__)
- 
-
 async def main():
     # Start Chrome
     chrome = ChromeRunner()
     await chrome.launch()
-    
-    # Connect to Chrome
+
+    # Connect to devtools websocket
     cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
 
@@ -38,14 +34,14 @@ async def main():
     await cdit.Page.enable()
 
     # Navigate to URL
-    await cdit.Page.navigate("https://google.com/")
+    await cdit.Page.navigate("https://www.google.com/")
 
     # Wait for the Page.loadEventFired event
     # This may not ever fire on some pages, so it's good to set a limit
     try:
         await cdit.wait_for("Page.loadEventFired", 10)
     except asyncio.TimeoutError:
-        logger.warn("Loaded event never fired")
+        print("Loaded event never fired!")
 
     # Take a screenshot
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
@@ -53,5 +49,6 @@ async def main():
     open("screenshot.png", "w+b").write(screenshot_bytes)
 
 
-asyncio.get_event_loop().run_until_complete(main())
+asyncio.run(main())
+
 ```
