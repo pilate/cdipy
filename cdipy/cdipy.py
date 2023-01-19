@@ -85,42 +85,44 @@ def fn_factory(command_name, parameters):
     return wrapper
 
 
-async def domain_setup():
+def load_domains():
     cache_path = get_cache_path()
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path, mode=0o744)
 
     if not os.listdir(cache_path):
-        await update_protocol_data()
+        asyncio.get_event_loop().run_until_complete(update_protocol_data())
 
-    domains = []
+    domains = {}
     for filename in os.listdir(cache_path):
         with open(cache_path / filename, "rb") as f:  # pylint: disable=invalid-name
             data = loads(f.read())
-        domains += data.get("domains", [])
 
-    for domain in domains:
-        domain_name = domain["domain"]
-        # Create a new class for each domain with the correct name
-        domain_class = types.new_class(domain_name, (DomainProxy,))
+        for domain in data.get("domains", []):
+            domain_name = domain["domain"]
 
-        # Add class methods for each domain function
-        for command in domain.get("commands", []):
-            command_name = command["name"]
+            # Create a new class for each domain with the correct name
+            domain_class = types.new_class(domain_name, (DomainProxy,))
 
-            # Create a new function for each domain command
-            new_fn = fn_factory(command_name, command.get("parameters", []))
+            # Add class methods for each domain function
+            for command in domain.get("commands", []):
+                command_name = command["name"]
 
-            # set name to something useful
-            new_fn.__name__ = new_fn.__qualname__ = f"{domain_name}.{command_name}"
+                # Create a new function for each domain command
+                new_fn = fn_factory(command_name, command.get("parameters", []))
 
-            setattr(domain_class, command_name, new_fn)
+                # set name to something useful
+                new_fn.__name__ = new_fn.__qualname__ = f"{domain_name}.{command_name}"
 
-        DOMAINS[domain_name] = domain_class
+                setattr(domain_class, command_name, new_fn)
+
+            domains[domain_name] = domain_class
+
+    return domains
 
 
-asyncio.get_event_loop().run_until_complete(domain_setup())
+DOMAINS = load_domains()
 
 
 class ResponseErrorException(Exception):
