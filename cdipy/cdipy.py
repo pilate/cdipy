@@ -113,7 +113,7 @@ async def domain_setup():
             new_fn = fn_factory(command_name, command.get("parameters", []))
 
             # set name to something useful
-            new_fn.__qualname__ = f"{domain_name}.{command_name}"
+            new_fn.__name__ = new_fn.__qualname__ = f"{domain_name}.{command_name}"
 
             setattr(domain_class, command_name, new_fn)
 
