@@ -31,7 +31,7 @@ MAX_INT = (2**31) - 1
 DOMAINS = {}
 
 
-class DomainProxy:
+class DomainProxy:  # pylint: disable=too-few-public-methods
     """
     Template class used for domains (ex: obj.Page)
     """
