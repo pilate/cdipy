@@ -1,6 +1,3 @@
-from asyncio import subprocess
-from pathlib import Path
-
 import asyncio
 import logging
 import os
@@ -8,13 +5,14 @@ import re
 import shutil
 import signal
 import tempfile
+from asyncio import subprocess
+from pathlib import Path
 
 
+LOGGER = logging.getLogger("cdipy.chrome")
 
-logger = logging.getLogger(__name__)
-
-
-DEFAULT_ARGS = [
+CHROME_PATH = os.environ.get("CDIPY_CHROME_PATH", "/usr/bin/google-chrome-stable")
+CHROME_PARAMS = [
     "--disable-background-networking",
     "--enable-features=NetworkService,NetworkServiceInProcess",
     "--disable-background-timer-throttling",
@@ -42,10 +40,9 @@ DEFAULT_ARGS = [
     "--headless",
     "--disable-gpu",
     "--hide-scrollbars",
-    "--mute-audio"
+    "--mute-audio",
 ]
 
-CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
@@ -54,28 +51,27 @@ class ChromeClosedException(Exception):
 
 
 class ChromeRunner:
-
     def __init__(self, proxy=None, tmp_path=None):
         super().__init__()
 
         self.proxy = proxy
 
         if tmp_path:
+            if not isinstance(tmp_path, Path):
+                tmp_path = Path(tmp_path)
             self.tmp_path = tmp_path
         else:
             self.tmp_path = Path(tempfile.mkdtemp())
 
         self.proc = None
-        self.proc_pid = None
         self.websocket_uri = None
-
 
     # Browser cleanup
     def __del__(self):
         # Kill chrome and all of its child processes
-        if self.proc_pid:
+        if self.proc and self.proc.pid:
             try:
-                os.killpg(os.getpgid(self.proc_pid), signal.SIGKILL)
+                os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
 
             except ProcessLookupError:
                 pass
@@ -83,26 +79,29 @@ class ChromeRunner:
         # Empty the user data directory
         shutil.rmtree(self.tmp_path, ignore_errors=True)
 
-
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
-        command = [chrome_path] + DEFAULT_ARGS + [f"--user-data-dir={self.tmp_path}"]
+        command = [chrome_path] + CHROME_PARAMS + [f"--user-data-dir={self.tmp_path}"]
 
         if extra_args:
             command += extra_args
 
         if self.proxy:
-            command += [f"--proxy-server={self.proxy}"]
+            command.append(f"--proxy-server={self.proxy}")
 
-        self.proc = await asyncio.create_subprocess_exec(*command,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
-        self.proc_pid = self.proc.pid
+        self.proc = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            preexec_fn=os.setsid,
+        )
 
         output = ""
         while True:
             if self.proc.returncode is not None:
                 stderr = await self.proc.stdout.read()
                 raise ChromeClosedException(
-                    f"Chrome closed unexpectedly with return code: {self.proc.returncode} ({stderr})")
+                    f"Chrome closed unexpectedly; code: {self.proc.returncode} ({stderr})"
+                )
 
             data = await self.proc.stdout.readline()
             output += data.decode()
@@ -112,4 +111,4 @@ class ChromeRunner:
                 break
 
         self.websocket_uri = search.group(1).strip()
-        logger.info("Parsed websocket URI: %s", self.websocket_uri)
+        LOGGER.info("Parsed websocket URI: %s", self.websocket_uri)

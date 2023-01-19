@@ -1,21 +1,22 @@
 import asyncio
 import base64
 import logging
+import sys
 
 from cdipy import ChromeDevTools
 from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
 
-logger = logging.getLogger(__name__)
-logging.getLogger("websockets").setLevel(logging.ERROR)
+LOGGER = logging.getLogger("cdipy.scripts.screenshot")
+FILENAME = "screenshot.png"
 
 
-async def main():
+async def async_main(url):
     # Start Chrome
     chrome = ChromeRunner()
     await chrome.launch()
-    
+
     # Connect to devtools websocket
     cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
@@ -31,19 +32,31 @@ async def main():
     await cdit.Page.enable()
 
     # Navigate to URL
-    await cdit.Page.navigate("https://google.com/")
+    LOGGER.info("Navigating to %s", url)
+    await cdit.Page.navigate(url)
 
     # Wait for the Page.loadEventFired event
     # This may not ever fire on some pages, so it's good to set a limit
     try:
         await cdit.wait_for("Page.loadEventFired", 10)
     except asyncio.TimeoutError:
-        logger.warn("Loaded event never fired")
+        print("Loaded event never fired!")
 
     # Take a screenshot
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
     screenshot_bytes = base64.b64decode(screenshot_response["data"])
-    open("screenshot.png", "w+b").write(screenshot_bytes)
+    open(FILENAME, "w+b").write(screenshot_bytes)
+    LOGGER.info("wrote %s", FILENAME)
 
 
-asyncio.get_event_loop().run_until_complete(main())
+def main():
+    logging.basicConfig(
+        format="[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(funcName)s] %(message)s",
+        level=logging.INFO,
+    )
+
+    asyncio.run(async_main(sys.argv[1]))
+
+
+if __name__ == "__main__":
+    main()

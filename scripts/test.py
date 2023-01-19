@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import logging
 
 from cdipy import ChromeDevTools
@@ -7,37 +6,44 @@ from cdipy import ChromeDevToolsTarget
 from cdipy import ChromeRunner
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("cdipy.scripts.test")
+logging.basicConfig(
+    format="[%(name)s:%(funcName)s:%(lineno)s] %(message)s", level=logging.DEBUG
+)
+
 logging.getLogger("websockets").setLevel(logging.ERROR)
+logging.getLogger("cdipy").setLevel(logging.INFO)
 
 
-async def main():
+async def crawl(url):
+    # Start Chrome
     chrome = ChromeRunner()
     await chrome.launch()
-    
+
+    # Connect to devtools websocket
     cdi = ChromeDevTools(chrome.websocket_uri)
     await cdi.connect()
 
+    # Create a new target and attach to it
     target = await cdi.Target.createTarget("about:blank")
-    print(f"Target: {target}")
-
     session = await cdi.Target.attachToTarget(targetId=target["targetId"])
-    print(f"Session: {session}")
 
+    # Create a ChromeDevToolsTarget class to handle target messages
     cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
-    await cdit.wait_for("Page.loadEventFired")
 
-    # await asyncio.gather(
-    #     cdit.Network.enable(),
-    #     cdit.Page.enable(),
-    #     cdit.Runtime.enable(),
-    #     cdit.Debugger.enable(),
-    #     cdit.Security.enable(),
-    #     cdit.Page.setDownloadBehavior(behavior="allow", downloadPath=str(chrome.tmp_path)))
+    await asyncio.gather(
+        cdit.Network.enable(),
+        cdit.Page.enable(),
+        cdit.Runtime.enable(),
+        cdit.Debugger.enable(),
+        cdit.Security.enable(),
+        cdit.Page.setDownloadBehavior(
+            behavior="allow", downloadPath=str(chrome.tmp_path)
+        ),
+    )
 
     # await asyncio.gather(
     #     cdit.Animation.enable(),
-    #     cdit.ApplicationCache.enable(),
     #     cdit.DOM.enable(),
     #     cdit.DOMSnapshot.enable(),
     #     cdit.DOMStorage.enable(),
@@ -65,17 +71,21 @@ async def main():
     #
     # cdit.on("Network.responseReceived", printer)
 
-    await cdit.Emulation.setDeviceMetricsOverride(width=1024, height=768, deviceScaleFactor=0, mobile=False)
-    await cdit.Network.setUserAgentOverride(userAgent="Definitely not headless Chrome")
-   
-    await cdit.Page.navigate("https://google.com/")
+    await cdit.Emulation.setDeviceMetricsOverride(
+        width=1024, height=768, deviceScaleFactor=0, mobile=False
+    )
 
-    await asyncio.sleep(10)
+    await cdit.Page.navigate(url)
+
+    await asyncio.sleep(5)
 
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
-    screenshot_bytes = base64.b64decode(screenshot_response["data"])
-    open("screenshot.png", "w+b").write(screenshot_bytes)
+    # screenshot_bytes = base64.b64decode(screenshot_response["data"])
+    # open("screenshot.png", "w+b").write(screenshot_bytes)
 
 
+async def main():
+    await crawl("http://google.com/")
 
-asyncio.get_event_loop().run_until_complete(main())
+
+asyncio.run(main())
