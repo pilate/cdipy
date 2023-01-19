@@ -11,8 +11,8 @@ from pathlib import Path
 
 LOGGER = logging.getLogger("cdipy.chrome")
 
-
-DEFAULT_ARGS = [
+CHROME_PATH = os.environ.get("CDIPY_CHROME_PATH", "/usr/bin/google-chrome-stable")
+CHROME_PARAMS = [
     "--disable-background-networking",
     "--enable-features=NetworkService,NetworkServiceInProcess",
     "--disable-background-timer-throttling",
@@ -43,7 +43,6 @@ DEFAULT_ARGS = [
     "--mute-audio",
 ]
 
-CHROME_PATH = "/usr/bin/google-chrome-stable"
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
@@ -80,7 +79,7 @@ class ChromeRunner:
         shutil.rmtree(self.tmp_path, ignore_errors=True)
 
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
-        command = [chrome_path] + DEFAULT_ARGS + [f"--user-data-dir={self.tmp_path}"]
+        command = [chrome_path] + CHROME_PARAMS + [f"--user-data-dir={self.tmp_path}"]
 
         if extra_args:
             command += extra_args
