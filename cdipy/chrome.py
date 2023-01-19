@@ -2,11 +2,9 @@ import asyncio
 import logging
 import os
 import re
-import shutil
 import signal
-import tempfile
+from tempfile import TemporaryDirectory
 from asyncio import subprocess
-from pathlib import Path
 
 
 LOGGER = logging.getLogger("cdipy.chrome")
@@ -56,7 +54,7 @@ class ChromeRunner:
 
         self.proxy = proxy
 
-        self.data_dir = tempfile.TemporaryDirectory()
+        self.data_dir = TemporaryDirectory()  # pylint: disable=consider-using-with
 
         self.proc = None
         self.websocket_uri = None
