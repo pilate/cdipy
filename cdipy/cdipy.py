@@ -174,7 +174,7 @@ class Devtools(DevtoolsEmitter):
 
     async def handle_message(self, message):
         """
-        Match incoming message ids against our dict of pending futures
+        Match incoming message ids to future_map
         Emit events for incomming methods
         """
         message = loads(message)
