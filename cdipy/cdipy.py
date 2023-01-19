@@ -255,7 +255,7 @@ class ChromeDevTools(Devtools):
         await self.websocket.send(dumps(command))
 
 
-class ChromeDevToolsTarget(Devtools):
+class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
     def __init__(self, devtools, session):
         super().__init__()
 
