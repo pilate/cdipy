@@ -67,21 +67,26 @@ def params_to_signature(params):
     return inspect.Signature(parameters=new_params)
 
 
-def fn_factory(command_name, parameters):
+def fn_factory(domain_name, command):
     """
     Creates a new function that can be used as a domain method
     """
+    command_name = command["name"]
+    command_str = f"{domain_name}.{command_name}"
+
+    parameters = command.get("parameters", [])
     signature = params_to_signature(parameters)
 
     async def wrapper(self, *args, **kwargs):
         """
-        - Validate method arguments against <signature>
-        - Attempt to execute method
+        Validate method arguments against `signature`
+        Pass validated args to execute_method
         """
         bound = signature.bind(*args, **kwargs)
         kwargs = bound.arguments
-        command = f"{self.__class__.__name__}.{command_name}"
-        return await self.devtools.execute_method(command, **kwargs)
+        return await self.devtools.execute_method(command_str, **kwargs)
+
+    wrapper.__name__ = wrapper.__qualname__ = command_str
 
     return wrapper
 
@@ -106,17 +111,10 @@ def load_domains():
             # Create a new class for each domain with the correct name
             domain_class = types.new_class(domain_name, (DomainBase,))
 
-            # Add class methods for each domain function
+            # Create a new function for each command and add to class
             for command in domain.get("commands", []):
-                command_name = command["name"]
-
-                # Create a new function for each domain command
-                new_fn = fn_factory(command_name, command.get("parameters", []))
-
-                # set name to something useful
-                new_fn.__name__ = new_fn.__qualname__ = f"{domain_name}.{command_name}"
-
-                setattr(domain_class, command_name, new_fn)
+                new_fn = fn_factory(domain_name, command)
+                setattr(domain_class, command["name"], new_fn)
 
             domains[domain_name] = domain_class
 
