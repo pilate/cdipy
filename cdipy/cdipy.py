@@ -188,6 +188,9 @@ class Devtools(DevtoolsEmitter):
 
         if "id" in message:
             future = self.future_map.pop(message["id"])
+            if future.cancelled():
+                return
+
             if error := message.get("error"):
                 future.set_exception(ResponseErrorException(error["message"]))
             else:
