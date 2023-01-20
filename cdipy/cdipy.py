@@ -6,6 +6,7 @@ import types
 from itertools import count
 
 import websockets
+import websockets.client
 from pyee import AsyncIOEventEmitter
 
 from cdipy.utils import get_cache_path, update_protocol_data
@@ -159,7 +160,7 @@ class Devtools(DevtoolsEmitter):
     def __init__(self):
         super().__init__()
 
-        self.future_map = {}
+        self.futures = {}
         self.counter = count()
 
     def __getattr__(self, attr):
@@ -180,17 +181,18 @@ class Devtools(DevtoolsEmitter):
 
     async def handle_message(self, message):
         """
-        Match incoming message ids to future_map
+        Match incoming message ids to self.futures
         Emit events for incoming methods
         """
         message = loads(message)
 
         if "id" in message:
-            future = self.future_map.pop(message["id"])
-            if error := message.get("error"):
-                future.set_exception(ResponseErrorException(error["message"]))
-            else:
-                future.set_result(message["result"])
+            future = self.futures.pop(message["id"])
+            if not future.cancelled():
+                if error := message.get("error"):
+                    future.set_exception(ResponseErrorException(error["message"]))
+                else:
+                    future.set_result(message["result"])
 
         elif "method" in message:
             self.emit(message["method"], **message["params"])
@@ -205,7 +207,7 @@ class Devtools(DevtoolsEmitter):
         command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
-        self.future_map[command["id"]] = result_future
+        self.futures[command["id"]] = result_future
 
         await self.send(command)
 
@@ -228,7 +230,7 @@ class ChromeDevTools(Devtools):
             self.task.cancel()
 
     async def connect(self):
-        self.websocket = await websockets.connect(
+        self.websocket = await websockets.client.connect(
             self.ws_uri,
             max_queue=None,
             max_size=None,
@@ -255,7 +257,7 @@ class ChromeDevTools(Devtools):
         await self.websocket.send(dumps(command))
 
 
-class ChromeDevToolsTarget(Devtools):
+class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
     def __init__(self, devtools, session):
         super().__init__()
 
@@ -280,7 +282,7 @@ class ChromeDevToolsTarget(Devtools):
         command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
-        self.future_map[command["id"]] = result_future
+        self.futures[command["id"]] = result_future
 
         await self.devtools.Target.sendMessageToTarget(dumps(command), self.session)
 

@@ -2,11 +2,9 @@ import asyncio
 import logging
 import os
 import re
-import shutil
 import signal
-import tempfile
+from tempfile import TemporaryDirectory
 from asyncio import subprocess
-from pathlib import Path
 
 
 LOGGER = logging.getLogger("cdipy.chrome")
@@ -51,24 +49,21 @@ class ChromeClosedException(Exception):
 
 
 class ChromeRunner:
-    def __init__(self, proxy=None, tmp_path=None):
+    def __init__(self, proxy=None):
         super().__init__()
 
         self.proxy = proxy
 
-        if tmp_path:
-            if not isinstance(tmp_path, Path):
-                tmp_path = Path(tmp_path)
-            self.tmp_path = tmp_path
-        else:
-            self.tmp_path = Path(tempfile.mkdtemp())
+        self.data_dir = TemporaryDirectory()  # pylint: disable=consider-using-with
 
         self.proc = None
         self.websocket_uri = None
 
-    # Browser cleanup
     def __del__(self):
-        # Kill chrome and all of its child processes
+        """
+        Kill the chrome we launched and all child processes
+        """
+
         if self.proc and self.proc.pid:
             try:
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
@@ -76,12 +71,8 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-        # Empty the user data directory
-        shutil.rmtree(self.tmp_path, ignore_errors=True)
-
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
-        command = [chrome_path] + CHROME_PARAMS + [f"--user-data-dir={self.tmp_path}"]
-
+        command = [chrome_path, *CHROME_PARAMS, f"--user-data-dir={self.data_dir.name}"]
         if extra_args:
             command += extra_args
 
