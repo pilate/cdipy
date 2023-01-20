@@ -67,14 +67,13 @@ class ChromeRunner:
         if self.proc and self.proc.pid:
             try:
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
-
             except ProcessLookupError:
                 pass
 
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
         command = [chrome_path, *CHROME_PARAMS, f"--user-data-dir={self.data_dir.name}"]
         if extra_args:
-            command += extra_args
+            command.extend(extra_args)
 
         if self.proxy:
             command.append(f"--proxy-server={self.proxy}")
