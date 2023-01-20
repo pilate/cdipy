@@ -160,7 +160,7 @@ class Devtools(DevtoolsEmitter):
     def __init__(self):
         super().__init__()
 
-        self.future_map = {}
+        self.futures = {}
         self.counter = count()
 
     def __getattr__(self, attr):
@@ -181,20 +181,18 @@ class Devtools(DevtoolsEmitter):
 
     async def handle_message(self, message):
         """
-        Match incoming message ids to future_map
+        Match incoming message ids to self.futures
         Emit events for incoming methods
         """
         message = loads(message)
 
         if "id" in message:
-            future = self.future_map.pop(message["id"])
-            if future.cancelled():
-                return
-
-            if error := message.get("error"):
-                future.set_exception(ResponseErrorException(error["message"]))
-            else:
-                future.set_result(message["result"])
+            future = self.futures.pop(message["id"])
+            if not future.cancelled():
+                if error := message.get("error"):
+                    future.set_exception(ResponseErrorException(error["message"]))
+                else:
+                    future.set_result(message["result"])
 
         elif "method" in message:
             self.emit(message["method"], **message["params"])
@@ -209,7 +207,7 @@ class Devtools(DevtoolsEmitter):
         command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
-        self.future_map[command["id"]] = result_future
+        self.futures[command["id"]] = result_future
 
         await self.send(command)
 
@@ -284,7 +282,7 @@ class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
         command = self.format_command(method, **kwargs)
 
         result_future = self.loop.create_future()
-        self.future_map[command["id"]] = result_future
+        self.futures[command["id"]] = result_future
 
         await self.devtools.Target.sendMessageToTarget(dumps(command), self.session)
 
