@@ -74,8 +74,7 @@ def fn_factory(domain_name, command):
     command_name = command["name"]
     command_str = f"{domain_name}.{command_name}"
 
-    parameters = command.get("parameters", [])
-    signature = params_to_signature(parameters)
+    signature = params_to_signature(command.get("parameters", []))
 
     async def wrapper(self, *args, **kwargs):
         """
