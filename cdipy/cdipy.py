@@ -225,7 +225,7 @@ class ChromeDevTools(Devtools):
         if hasattr(self, "task"):
             self.task.cancel()
 
-    async def connect(self):
+    async def connect(self, compression=None):
         self.websocket = await websockets.client.connect(
             self.ws_uri,
             max_queue=None,
@@ -233,6 +233,7 @@ class ChromeDevTools(Devtools):
             read_limit=MAX_INT,
             write_limit=MAX_INT,
             ping_interval=None,
+            compression=compression
         )
         self.task = asyncio.ensure_future(self._recv_loop())
 
