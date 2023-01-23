@@ -40,6 +40,8 @@ CHROME_PARAMS = [
     "--hide-scrollbars",
     "--mute-audio",
 ]
+if not os.environ.get("CDIPY_USE_SHM"):
+    CHROME_PARAMS.append("--disable-dev-shm-usage")
 
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
