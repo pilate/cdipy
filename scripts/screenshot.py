@@ -45,7 +45,10 @@ async def async_main(url):
     # Take a screenshot
     screenshot_response = await cdit.Page.captureScreenshot(format="png")
     screenshot_bytes = base64.b64decode(screenshot_response["data"])
-    open(FILENAME, "w+b").write(screenshot_bytes)
+
+    with open(FILENAME, "w+b") as fileobj:
+        fileobj.write(screenshot_bytes)
+
     LOGGER.info("wrote %s", FILENAME)
 
 
