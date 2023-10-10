@@ -11,20 +11,7 @@ import websockets.client
 from pyee import AsyncIOEventEmitter
 
 from cdipy.utils import get_cache_path, update_protocol_data
-
-try:
-    from orjson import dumps as _dumps
-    from orjson import loads
-
-    # orjson returns bytes
-    def dumps(data):
-        return _dumps(data).decode("utf-8")
-
-except ModuleNotFoundError:
-    try:
-        from ujson import dumps, loads
-    except ModuleNotFoundError:
-        from json import dumps, loads
+from cdipy.fjson import dumps, loads
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
