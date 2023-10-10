@@ -29,7 +29,6 @@ except ModuleNotFoundError:
 
 LOGGER = logging.getLogger("cdipy.cdipy")
 
-MAX_INT = (2**31) - 1
 DOMAINS = {}
 
 
