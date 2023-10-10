@@ -50,10 +50,7 @@ async def async_main(url):
 
 
 def main():
-    logging.basicConfig(
-        format="[%(asctime)s.%(msecs)03d][%(levelname)s][%(filename)s:%(funcName)s] %(message)s",
-        level=logging.INFO,
-    )
+    logging.basicConfig(level=logging.INFO)
 
     asyncio.run(async_main(sys.argv[1]))
 
