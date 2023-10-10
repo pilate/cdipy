@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import logging
 import os
+import sys
 import types
 from itertools import count
 
@@ -230,10 +231,10 @@ class ChromeDevTools(Devtools):
             self.ws_uri,
             max_queue=None,
             max_size=None,
-            read_limit=MAX_INT,
-            write_limit=MAX_INT,
+            read_limit=sys.maxsize,
+            write_limit=sys.maxsize,
             ping_interval=None,
-            compression=compression
+            compression=compression,
         )
         self.task = asyncio.ensure_future(self._recv_loop())
 
