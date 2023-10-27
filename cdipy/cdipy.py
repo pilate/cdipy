@@ -209,8 +209,8 @@ class ChromeDevTools(Devtools):
         self.ws_uri = websocket_uri
 
     def __del__(self):
-        if hasattr(self, "task"):
-            self.task.cancel()
+        if task := getattr(self, "task", None):
+            task.cancel()
 
     async def connect(self, compression=None):
         self.websocket = await websockets.client.connect(
