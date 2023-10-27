@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import logging
 import os
+import sys
 import types
 from itertools import count
 
@@ -10,25 +11,11 @@ import websockets.client
 from pyee import AsyncIOEventEmitter
 
 from cdipy.utils import get_cache_path, update_protocol_data
-
-try:
-    from orjson import dumps as _dumps
-    from orjson import loads
-
-    # orjson returns bytes
-    def dumps(data):
-        return _dumps(data).decode("utf-8")
-
-except ModuleNotFoundError:
-    try:
-        from ujson import dumps, loads
-    except ModuleNotFoundError:
-        from json import dumps, loads
+from cdipy.fjson import dumps, loads
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
 
-MAX_INT = (2**31) - 1
 DOMAINS = {}
 
 
@@ -222,18 +209,18 @@ class ChromeDevTools(Devtools):
         self.ws_uri = websocket_uri
 
     def __del__(self):
-        if hasattr(self, "task"):
-            self.task.cancel()
+        if task := getattr(self, "task", None):
+            task.cancel()
 
     async def connect(self, compression=None):
         self.websocket = await websockets.client.connect(
             self.ws_uri,
             max_queue=None,
             max_size=None,
-            read_limit=MAX_INT,
-            write_limit=MAX_INT,
+            read_limit=sys.maxsize,
+            write_limit=sys.maxsize,
             ping_interval=None,
-            compression=compression
+            compression=compression,
         )
         self.task = asyncio.ensure_future(self._recv_loop())
 
