@@ -15,4 +15,4 @@ except ModuleNotFoundError:
         from json import dumps, loads
 
 
-__all__ = [dumps, loads]
+__all__ = ["dumps", "loads"]
