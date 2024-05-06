@@ -35,7 +35,7 @@ CHROME_PARAMS = [
     "--remote-debugging-port=0",
     "--use-mock-keychain",
     "--enable-blink-features=IdleDetection",
-    "--headless",
+    "--headless=new",
     "--disable-gpu",
     "--hide-scrollbars",
     "--mute-audio",
