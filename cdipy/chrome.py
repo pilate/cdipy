@@ -35,7 +35,6 @@ CHROME_PARAMS = [
     "--remote-debugging-port=0",
     "--use-mock-keychain",
     "--enable-blink-features=IdleDetection",
-    "--headless=new",
     "--disable-gpu",
     "--hide-scrollbars",
     "--mute-audio",
@@ -72,8 +71,17 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-    async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
-        command = [chrome_path, *CHROME_PARAMS, f"--user-data-dir={self.data_dir.name}"]
+    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, new=False):
+        headless = "--headless"
+        if new:
+            headless = "--headless=new"
+
+        command = [
+            chrome_path,
+            *CHROME_PARAMS,
+            headless,
+            f"--user-data-dir={self.data_dir.name}",
+        ]
         if extra_args:
             command.extend(extra_args)
 
