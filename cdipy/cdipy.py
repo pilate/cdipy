@@ -217,8 +217,8 @@ class ChromeDevTools(Devtools):
             self.ws_uri,
             max_queue=None,
             max_size=None,
-            read_limit=sys.maxsize,
-            write_limit=sys.maxsize,
+            read_limit=2**24,
+            write_limit=2**24,
             ping_interval=None,
             compression=compression,
         )
