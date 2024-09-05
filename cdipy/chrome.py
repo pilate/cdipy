@@ -72,7 +72,7 @@ class ChromeRunner:
                 pass
 
     async def launch(self, chrome_path=CHROME_PATH, extra_args=None, new=False):
-        headless = "--headless"
+        headless = "--headless=old"
         if new:
             headless = "--headless=new"
 
