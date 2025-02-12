@@ -3,8 +3,8 @@ import logging
 import os
 import re
 import signal
-from tempfile import TemporaryDirectory
 from asyncio import subprocess
+from tempfile import TemporaryDirectory
 
 
 LOGGER = logging.getLogger("cdipy.chrome")
@@ -35,7 +35,7 @@ CHROME_PARAMS = [
     "--no-first-run",
     "--ash-no-nudges",
     "--disable-search-engine-choice-screen",
-    "--propagate-iph-for-testing"
+    "--propagate-iph-for-testing",
     "--no-default-browser-check",
     "--password-store=basic",
     "--remote-debugging-port=0",
