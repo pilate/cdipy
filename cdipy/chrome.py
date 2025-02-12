@@ -18,9 +18,11 @@ CHROME_PARAMS = [
     "--disable-breakpad",
     "--disable-client-side-phishing-detection",
     "--disable-component-extensions-with-background-pages",
+    "--disable-component-update",
     "--disable-default-apps",
+    "--disable-domain-reliability",
     "--disable-extensions",
-    "--disable-features=Translate",
+    "--disable-features=CalculateNativeWinOcclusion,InterestFeedContentSuggestions,Translate",
     "--disable-hang-monitor",
     "--disable-ipc-flooding-protection",
     "--disable-popup-blocking",
@@ -31,11 +33,14 @@ CHROME_PARAMS = [
     "--force-color-profile=srgb",
     "--metrics-recording-only",
     "--no-first-run",
+    "--ash-no-nudges",
+    "--disable-search-engine-choice-screen",
+    "--propagate-iph-for-testing"
+    "--no-default-browser-check",
     "--password-store=basic",
     "--remote-debugging-port=0",
     "--use-mock-keychain",
     "--enable-blink-features=IdleDetection",
-    "--headless",
     "--disable-gpu",
     "--hide-scrollbars",
     "--mute-audio",
@@ -72,8 +77,17 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-    async def launch(self, chrome_path=CHROME_PATH, extra_args=None):
-        command = [chrome_path, *CHROME_PARAMS, f"--user-data-dir={self.data_dir.name}"]
+    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, new=False):
+        headless = "--headless=old"
+        if new:
+            headless = "--headless=new"
+
+        command = [
+            chrome_path,
+            *CHROME_PARAMS,
+            headless,
+            f"--user-data-dir={self.data_dir.name}",
+        ]
         if extra_args:
             command.extend(extra_args)
 
