@@ -77,17 +77,14 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, new=False):
-        headless = "--headless=old"
-        if new:
-            headless = "--headless=new"
-
+    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, headless="new"):
         command = [
             chrome_path,
             *CHROME_PARAMS,
-            headless,
+            f"--headless={headless}",
             f"--user-data-dir={self.data_dir.name}",
         ]
+
         if extra_args:
             command.extend(extra_args)
 

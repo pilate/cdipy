@@ -2,16 +2,15 @@ import asyncio
 import inspect
 import logging
 import os
-import sys
 import types
 from itertools import count
 
 import websockets
-import websockets.client
-from pyee import AsyncIOEventEmitter
+import websockets.asyncio
+from pyee.asyncio import AsyncIOEventEmitter
 
-from cdipy.utils import get_cache_path, update_protocol_data
 from cdipy.fjson import dumps, loads
+from cdipy.utils import get_cache_path, update_protocol_data
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
@@ -213,7 +212,7 @@ class ChromeDevTools(Devtools):
             task.cancel()
 
     async def connect(self, compression=None):
-        self.websocket = await websockets.client.connect(
+        self.websocket = await websockets.asyncio.client.connect(
             self.ws_uri,
             max_queue=None,
             max_size=None,
