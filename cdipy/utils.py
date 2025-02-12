@@ -13,7 +13,10 @@ SOURCE_FILES = [f"{ROOT}/browser_protocol.json", f"{ROOT}/js_protocol.json"]
 OS_VAR = "CDIPY_CACHE"
 
 
-def get_cache_path():
+def get_cache_path() -> Path:
+    """
+    Search system paths for existing cache
+    """
     cache_dir = os.environ.get(OS_VAR)
     if cache_dir:
         return Path(cache_dir)
@@ -32,7 +35,10 @@ def get_cache_path():
     return Path(full_path)
 
 
-async def update_protocol_data():
+async def update_protocol_data() -> None:
+    """
+    Download latest protocol definition
+    """
     async with aiohttp.ClientSession() as session:
         requests = []
         for url in SOURCE_FILES:

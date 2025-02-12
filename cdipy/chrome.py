@@ -56,7 +56,7 @@ class ChromeClosedException(Exception):
 
 
 class ChromeRunner:
-    def __init__(self, proxy=None):
+    def __init__(self, proxy: str = None):
         super().__init__()
 
         self.proxy = proxy
@@ -77,7 +77,12 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, headless="new"):
+    async def launch(
+        self,
+        chrome_path: str = CHROME_PATH,
+        extra_args: list = None,
+        headless: str = "new",
+    ) -> None:
         command = [
             chrome_path,
             *CHROME_PARAMS,
