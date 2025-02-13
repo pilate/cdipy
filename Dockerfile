@@ -14,10 +14,6 @@ RUN apt-get install -y --no-install-recommends wget gnupg2 \
 && apt-get install -y google-chrome-stable \
 && apt-get purge --auto-remove -y
 
-# Python layer
-RUN pip install --upgrade pip \
-&& pip install 'pyee<10.1.0' requests setuptools orjson 'websockets<=11.1' 'aiohttp<3.9.0'
-
 # Making non-root user for chrome
 RUN useradd -ms /bin/bash user
 RUN mkdir -p /opt/cdipy
@@ -26,6 +22,6 @@ RUN chown -R user /opt/cdipy
 COPY . /opt/cdipy
 WORKDIR /opt/cdipy
 USER user
-RUN python setup.py install --user
+RUN pip install /opt/cdipy
 
 CMD ["bash"]

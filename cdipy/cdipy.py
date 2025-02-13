@@ -2,16 +2,16 @@ import asyncio
 import inspect
 import logging
 import os
-import sys
 import types
 from itertools import count
 
-import websockets
-import websockets.client
-from pyee import AsyncIOEventEmitter
+import websockets.asyncio.client
+import websockets.asyncio.connection
+import websockets.exceptions
+from pyee.asyncio import AsyncIOEventEmitter
 
-from cdipy.utils import get_cache_path, update_protocol_data
 from cdipy.fjson import dumps, loads
+from cdipy.utils import get_cache_path, update_protocol_data
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
@@ -26,7 +26,7 @@ class DomainBase:  # pylint: disable=too-few-public-methods
 
     __slots__ = ("devtools",)
 
-    def __init__(self, devtools):
+    def __init__(self, devtools: "ChromeDevTools"):
         self.devtools = devtools
 
 
@@ -88,8 +88,8 @@ def load_domains():
 
     domains = {}
     for filename in os.listdir(cache_path):
-        with open(cache_path / filename, "rb") as f:  # pylint: disable=invalid-name
-            data = loads(f.read())
+        with open(cache_path / filename, "rb") as fp:
+            data = loads(fp.read())
 
         for domain in data.get("domains", []):
             domain_name = domain["domain"]
@@ -123,7 +123,7 @@ class DevtoolsEmitter(AsyncIOEventEmitter):
 
         self.loop = asyncio.get_event_loop()
 
-    def wait_for(self, event, timeout=0):
+    def wait_for(self, event: str, timeout: int = 0) -> asyncio.Future:
         """
         Wait for a specific event to fire before returning
         """
@@ -146,7 +146,7 @@ class Devtools(DevtoolsEmitter):
         self.futures = {}
         self.counter = count()
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         """
         Load each domain on demand
         """
@@ -155,14 +155,14 @@ class Devtools(DevtoolsEmitter):
 
         return super().__getattribute__(attr)
 
-    def format_command(self, method, **kwargs):
+    def format_command(self, method: str, **kwargs) -> dict:
         """
         Convert method name + arguments to a devtools command
         """
 
         return {"id": next(self.counter), "method": method, "params": kwargs}
 
-    async def handle_message(self, message):
+    async def handle_message(self, message: str) -> None:
         """
         Match incoming message ids to self.futures
         Emit events for incoming methods
@@ -183,7 +183,7 @@ class Devtools(DevtoolsEmitter):
         else:
             raise UnknownMessageException(f"Unknown message format: {message}")
 
-    async def execute_method(self, method, **kwargs):
+    async def execute_method(self, method: str, **kwargs) -> dict:
         """
         Called by the add_command wrapper with the method name and validated arguments
         """
@@ -201,26 +201,25 @@ class Devtools(DevtoolsEmitter):
 
 
 class ChromeDevTools(Devtools):
-    def __init__(self, websocket_uri):
+    def __init__(self, websocket_uri: str):
         super().__init__()
 
-        self.task = None
-        self.websocket = None
-        self.ws_uri = websocket_uri
+        self.task: asyncio.Future | None = None
+        self.ws_uri: str | None = websocket_uri
+        self.websocket: websockets.asyncio.connection.Connection = None
 
     def __del__(self):
         if task := getattr(self, "task", None):
             task.cancel()
 
-    async def connect(self, compression=None):
-        self.websocket = await websockets.client.connect(
+    async def connect(self, compression: str | None = None) -> None:
+        self.websocket = await websockets.asyncio.client.connect(
             self.ws_uri,
-            max_queue=None,
-            max_size=None,
-            read_limit=2**24,
-            write_limit=2**24,
-            ping_interval=None,
             compression=compression,
+            max_size=None,
+            max_queue=None,
+            write_limit=0,
+            ping_interval=None,
         )
         self.task = asyncio.ensure_future(self._recv_loop())
 
@@ -236,13 +235,13 @@ class ChromeDevTools(Devtools):
 
             await self.handle_message(recv_data)
 
-    async def send(self, command):
+    async def send(self, command: dict) -> None:
         LOGGER.debug("send: %s", command)
         await self.websocket.send(dumps(command))
 
 
 class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
-    def __init__(self, devtools, session):
+    def __init__(self, devtools: ChromeDevTools, session: str):
         super().__init__()
 
         self.devtools = devtools
@@ -258,7 +257,7 @@ class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
 
         await self.handle_message(message)
 
-    async def execute_method(self, method, **kwargs):
+    async def execute_method(self, method: str, **kwargs):
         """
         Target commands are in the same format, but sent as a parameter to
         the sendMessageToTarget method

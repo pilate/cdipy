@@ -3,8 +3,8 @@ import logging
 import os
 import re
 import signal
-from tempfile import TemporaryDirectory
 from asyncio import subprocess
+from tempfile import TemporaryDirectory
 
 
 LOGGER = logging.getLogger("cdipy.chrome")
@@ -35,7 +35,7 @@ CHROME_PARAMS = [
     "--no-first-run",
     "--ash-no-nudges",
     "--disable-search-engine-choice-screen",
-    "--propagate-iph-for-testing"
+    "--propagate-iph-for-testing",
     "--no-default-browser-check",
     "--password-store=basic",
     "--remote-debugging-port=0",
@@ -56,7 +56,7 @@ class ChromeClosedException(Exception):
 
 
 class ChromeRunner:
-    def __init__(self, proxy=None):
+    def __init__(self, proxy: str = None):
         super().__init__()
 
         self.proxy = proxy
@@ -77,17 +77,19 @@ class ChromeRunner:
             except ProcessLookupError:
                 pass
 
-    async def launch(self, chrome_path=CHROME_PATH, extra_args=None, new=False):
-        headless = "--headless=old"
-        if new:
-            headless = "--headless=new"
-
+    async def launch(
+        self,
+        chrome_path: str = CHROME_PATH,
+        extra_args: list = None,
+        headless: str = "new",
+    ) -> None:
         command = [
             chrome_path,
             *CHROME_PARAMS,
-            headless,
+            f"--headless={headless}",
             f"--user-data-dir={self.data_dir.name}",
         ]
+
         if extra_args:
             command.extend(extra_args)
 
