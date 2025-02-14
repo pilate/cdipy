@@ -6,6 +6,8 @@ import signal
 from asyncio import subprocess
 from tempfile import TemporaryDirectory
 
+from .exceptions import ChromeClosedException
+
 
 LOGGER = logging.getLogger("cdipy.chrome")
 
@@ -49,10 +51,6 @@ if not os.environ.get("CDIPY_USE_SHM"):
     CHROME_PARAMS.append("--disable-dev-shm-usage")
 
 WS_RE = re.compile(r"listening on (ws://[^ ]*)")
-
-
-class ChromeClosedException(Exception):
-    pass
 
 
 class ChromeRunner:

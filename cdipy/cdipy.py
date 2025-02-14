@@ -1,120 +1,35 @@
 import asyncio
-import inspect
 import logging
-import os
-import types
+import typing
 from itertools import count
 
+import msgspec
 import websockets.asyncio.client
 import websockets.asyncio.connection
 import websockets.exceptions
 from pyee.asyncio import AsyncIOEventEmitter
 
-from cdipy.fjson import dumps, loads
-from cdipy.utils import get_cache_path, update_protocol_data
+from .exceptions import ResponseErrorException, UnknownMessageException
+from .protocol import DOMAINS
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
 
-DOMAINS = {}
+
+class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
+    message: str
 
 
-class DomainBase:  # pylint: disable=too-few-public-methods
-    """
-    Template class used for domains (ex: obj.Page)
-    """
-
-    __slots__ = ("devtools",)
-
-    def __init__(self, devtools: "ChromeDevTools"):
-        self.devtools = devtools
+class Message(msgspec.Struct):  # pylint: disable=too-few-public-methods
+    id: int = None
+    method: str = None
+    params: typing.Any = None
+    result: typing.Any = None
+    error: MessageError = None
 
 
-def params_to_signature(params):
-    """
-    Creates a function signature based on a list of protocol parameters
-    """
-    new_params = []
-
-    for param in params:
-        default = inspect.Parameter.empty
-        if param.get("optional"):
-            default = None
-
-        new_param = inspect.Parameter(
-            name=param["name"],
-            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=default,
-        )
-
-        new_params.append(new_param)
-
-    new_params.sort(key=lambda p: bool(p.default), reverse=True)
-
-    return inspect.Signature(parameters=new_params)
-
-
-def add_command(domain_class, command):
-    """
-    Creates a new function that can be used as a domain method
-    """
-    command_name = command["name"]
-    command_str = f"{domain_class.__name__}.{command_name}"
-
-    signature = params_to_signature(command.get("parameters", []))
-
-    async def wrapper(self, *args, **kwargs):
-        """
-        Validate method arguments against `signature`
-        Pass validated args to execute_method
-        """
-        bound = signature.bind(*args, **kwargs)
-        kwargs = bound.arguments
-        return await self.devtools.execute_method(command_str, **kwargs)
-
-    wrapper.__name__ = wrapper.__qualname__ = command_str
-
-    setattr(domain_class, command_name, wrapper)
-
-
-def load_domains():
-    cache_path = get_cache_path()
-
-    if not os.path.exists(cache_path):
-        os.makedirs(cache_path, mode=0o744)
-
-    if not os.listdir(cache_path):
-        asyncio.get_event_loop().run_until_complete(update_protocol_data())
-
-    domains = {}
-    for filename in os.listdir(cache_path):
-        with open(cache_path / filename, "rb") as fp:
-            data = loads(fp.read())
-
-        for domain in data.get("domains", []):
-            domain_name = domain["domain"]
-
-            # Create a new class for each domain
-            domain_class = types.new_class(domain_name, (DomainBase,))
-
-            # Add each command to the domain class
-            for command in domain.get("commands", []):
-                add_command(domain_class, command)
-
-            domains[domain_name] = domain_class
-
-    return domains
-
-
-DOMAINS = load_domains()
-
-
-class ResponseErrorException(Exception):
-    pass
-
-
-class UnknownMessageException(Exception):
-    pass
+MSG_DECODER = msgspec.json.Decoder(type=Message)
+MSG_ENCODER = msgspec.json.Encoder()
 
 
 class DevtoolsEmitter(AsyncIOEventEmitter):
@@ -159,7 +74,6 @@ class Devtools(DevtoolsEmitter):
         """
         Convert method name + arguments to a devtools command
         """
-
         return {"id": next(self.counter), "method": method, "params": kwargs}
 
     async def handle_message(self, message: str) -> None:
@@ -167,18 +81,21 @@ class Devtools(DevtoolsEmitter):
         Match incoming message ids to self.futures
         Emit events for incoming methods
         """
-        message = loads(message)
+        message = MSG_DECODER.decode(message)
 
-        if "id" in message:
-            future = self.futures.pop(message["id"])
+        if message.id is not None:
+            future = self.futures.pop(message.id)
             if not future.cancelled():
-                if error := message.get("error"):
-                    future.set_exception(ResponseErrorException(error["message"]))
+                if error := message.error:
+                    future.set_exception(ResponseErrorException(error.message))
                 else:
-                    future.set_result(message["result"])
+                    future.set_result(message.result)
 
-        elif "method" in message:
-            self.emit(message["method"], **message["params"])
+        elif message.method:
+            self.emit(message.method, **message.params)
+
+        elif message.error:
+            raise ResponseErrorException(message.error.message)
 
         else:
             raise UnknownMessageException(f"Unknown message format: {message}")
@@ -226,7 +143,7 @@ class ChromeDevTools(Devtools):
     async def _recv_loop(self):
         while True:
             try:
-                recv_data = await self.websocket.recv()
+                recv_data = await self.websocket.recv(decode=None)
                 LOGGER.debug("recv: %s", recv_data)
 
             except websockets.exceptions.ConnectionClosed:
@@ -237,7 +154,7 @@ class ChromeDevTools(Devtools):
 
     async def send(self, command: dict) -> None:
         LOGGER.debug("send: %s", command)
-        await self.websocket.send(dumps(command))
+        await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
 
 class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
@@ -267,6 +184,7 @@ class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
         result_future = self.loop.create_future()
         self.futures[command["id"]] = result_future
 
-        await self.devtools.Target.sendMessageToTarget(dumps(command), self.session)
+        message = MSG_ENCODER.encode(command).decode()
+        await self.devtools.Target.sendMessageToTarget(message, self.session)
 
         return await result_future
