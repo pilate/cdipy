@@ -8,6 +8,9 @@ import msgspec.json
 from .utils import get_cache_path, update_protocol_data
 
 
+SKIP_VALIDATION = os.environ.get("CDIPY_SKIP_VALIDATION", False)
+
+
 class DomainBase:  # pylint: disable=too-few-public-methods
     """
     Template class used for domains (ex: obj.Page)
@@ -52,13 +55,14 @@ def add_command(domain_class, command):
 
     signature = params_to_signature(command.get("parameters", []))
 
-    async def wrapper(self, *args, **kwargs):
+    async def wrapper(self, **kwargs):
         """
         Validate method arguments against `signature`
         Pass validated args to execute_method
         """
-        bound = signature.bind(*args, **kwargs)
-        kwargs = bound.arguments
+        if not SKIP_VALIDATION:
+            kwargs = signature.bind(**kwargs).arguments
+
         return await self.devtools.execute_method(command_str, **kwargs)
 
     wrapper.__name__ = wrapper.__qualname__ = command_str

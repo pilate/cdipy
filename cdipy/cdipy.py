@@ -185,6 +185,8 @@ class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
         self.futures[command["id"]] = result_future
 
         message = MSG_ENCODER.encode(command).decode()
-        await self.devtools.Target.sendMessageToTarget(message, self.session)
+        await self.devtools.Target.sendMessageToTarget(
+            message=message, sessionId=self.session
+        )
 
         return await result_future
