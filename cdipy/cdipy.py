@@ -158,21 +158,20 @@ class ChromeDevTools(Devtools):
 
 
 class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
-    def __init__(self, devtools: ChromeDevTools, session: str, isolate=True):
+    def __init__(self, devtools: ChromeDevTools, session: str):
         super().__init__()
 
         self.devtools = devtools
         self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
 
         self.session = session
-        self.isolate = isolate
 
     async def _target_recv(
         self, sessionId, message, **_
     ):  # pylint: disable=invalid-name
-        if self.isolate and (sessionId != self.session):
+        if sessionId != self.session:
             return
-
+        
         await self.handle_message(message)
 
     async def execute_method(self, method: str, **kwargs):
