@@ -138,7 +138,7 @@ class ChromeDevTools(Devtools):
             write_limit=0,
             ping_interval=None,
         )
-        self.task = asyncio.ensure_future(self._recv_loop())
+        self.task = asyncio.create_task(self._recv_loop())
 
     async def _recv_loop(self):
         while True:
