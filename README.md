@@ -30,7 +30,7 @@ async def async_main(url):
     await cdi.connect()
 
     # Create a new target and attach to it
-    target = await cdi.Target.createTarget("about:blank")
+    target = await cdi.Target.createTarget(url="about:blank")
     session = await cdi.Target.attachToTarget(targetId=target["targetId"])
 
     # Create a ChromeDevToolsTarget class to handle target messages
@@ -41,7 +41,7 @@ async def async_main(url):
 
     # Navigate to URL
     LOGGER.info("Navigating to %s", url)
-    await cdit.Page.navigate(url)
+    await cdit.Page.navigate(url=url)
 
     # Wait for the Page.loadEventFired event
     # This may not ever fire on some pages, so it's good to set a limit
