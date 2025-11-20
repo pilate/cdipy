@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import typing
 from itertools import count
@@ -81,24 +82,27 @@ class Devtools(DevtoolsEmitter):
         Match incoming message ids to self.futures
         Emit events for incoming methods
         """
-        message = MSG_DECODER.decode(message)
+        try:
+            message_obj = MSG_DECODER.decode(message)
+        except msgspec.DecodeError:
+            message_obj = Message(**json.loads(message))
 
-        if message.id is not None:
-            future = self.futures.pop(message.id)
+        if message_obj.id is not None:
+            future = self.futures.pop(message_obj.id)
             if not future.cancelled():
-                if error := message.error:
+                if error := message_obj.error:
                     future.set_exception(ResponseErrorException(error.message))
                 else:
-                    future.set_result(message.result)
+                    future.set_result(message_obj.result)
 
-        elif message.method:
-            self.emit(message.method, **message.params)
+        elif message_obj.method:
+            self.emit(message_obj.method, **message_obj.params)
 
-        elif message.error:
-            raise ResponseErrorException(message.error.message)
+        elif message_obj.error:
+            raise ResponseErrorException(message_obj.error.message)
 
         else:
-            raise UnknownMessageException(f"Unknown message format: {message}")
+            raise UnknownMessageException(f"Unknown message format: {message_obj}")
 
     async def execute_method(self, method: str, **kwargs) -> dict:
         """
