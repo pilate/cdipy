@@ -171,7 +171,7 @@ class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
     ):  # pylint: disable=invalid-name
         if sessionId != self.session:
             return
-        
+
         await self.handle_message(message)
 
     async def execute_method(self, method: str, **kwargs):
