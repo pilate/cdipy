@@ -3,6 +3,8 @@ Chrome Devtools Interface that instruments Chrome via the [devtools protocol](ht
 
 Meant to serve as a pythonic version of [chrome-remote-interface](https://github.com/cyrus-and/chrome-remote-interface).
 
+> **Note:** cdipy requires CDP flat mode. Always pass `flatten=True` when calling `Target.attachToTarget`, otherwise target sessions will not receive messages.
+
 ### Example Usage
 ```python
 
@@ -31,7 +33,7 @@ async def async_main(url):
 
     # Create a new target and attach to it
     target = await cdi.Target.createTarget(url="about:blank")
-    session = await cdi.Target.attachToTarget(targetId=target["targetId"])
+    session = await cdi.Target.attachToTarget(targetId=target["targetId"], flatten=True)
 
     # Create a ChromeDevToolsTarget class to handle target messages
     cdit = ChromeDevToolsTarget(cdi, session["sessionId"])
