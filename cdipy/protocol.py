@@ -55,15 +55,13 @@ def add_command(domain_class, command):
 
     signature = params_to_signature(command.get("parameters", []))
 
-    async def wrapper(self, **kwargs):
-        """
-        Validate method arguments against `signature`
-        Pass validated args to execute_method
-        """
-        if not SKIP_VALIDATION:
+    if SKIP_VALIDATION:
+        async def wrapper(self, **kwargs):
+            return await self.devtools.execute_method(command_str, **kwargs)
+    else:
+        async def wrapper(self, **kwargs):
             kwargs = signature.bind(**kwargs).arguments
-
-        return await self.devtools.execute_method(command_str, **kwargs)
+            return await self.devtools.execute_method(command_str, **kwargs)
 
     wrapper.__name__ = wrapper.__qualname__ = command_str
 
