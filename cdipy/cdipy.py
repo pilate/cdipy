@@ -21,40 +21,28 @@ class EventEmitter:
 
     def __init__(self):
         self._listeners = {}
+        self._once_listeners = {}
 
     def on(self, event, listener):
-        self._listeners.setdefault(event, []).append((listener, False))
-        return self
+        self._listeners.setdefault(event, []).append(listener)
 
     def once(self, event, listener):
-        self._listeners.setdefault(event, []).append((listener, True))
-        return self
+        self._once_listeners.setdefault(event, []).append(listener)
 
     def off(self, event, listener):
-        if entries := self._listeners.get(event):
-            kept = [(l, o) for l, o in entries if l is not listener]
-            if kept:
-                self._listeners[event] = kept
-            else:
-                del self._listeners[event]
+        for mapping in (self._listeners, self._once_listeners):
+            if entries := mapping.get(event):
+                entries.remove(listener)
+                if not entries:
+                    del mapping[event]
 
     def emit(self, event, *args, **kwargs):
-        entries = self._listeners.get(event)
-        if not entries:
-            return
-        has_once = False
-        for listener, is_once in entries:
-            if is_once:
-                has_once = True
+        listeners = self._listeners.get(event, ())
+        once = self._once_listeners.pop(event, ())
+        for listener in (*listeners, *once):
             result = listener(*args, **kwargs)
             if asyncio.iscoroutine(result):
                 self.loop.create_task(result)
-        if has_once:
-            kept = [(l, o) for l, o in entries if not o]
-            if kept:
-                self._listeners[event] = kept
-            else:
-                del self._listeners[event]
 
 
 class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
