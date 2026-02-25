@@ -197,6 +197,13 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools.sessions[session] = self
         self.session = session
 
-    async def send(self, command: Command) -> None:
-        command.sessionId = self.session
-        await self.devtools.send(command)
+    async def execute_method(self, method: str, **kwargs) -> dict:
+        cmd_id = next(self.counter)
+        future = self.loop.create_future()
+        self.futures[cmd_id] = future
+
+        await self.devtools.send(
+            Command(id=cmd_id, method=method, params=kwargs, sessionId=self.session)
+        )
+
+        return await future
