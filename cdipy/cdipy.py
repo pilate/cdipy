@@ -37,7 +37,7 @@ class DevtoolsEmitter(AsyncIOEventEmitter):
     def __init__(self):
         super().__init__()
 
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.get_running_loop()
 
     def wait_for(self, event: str, timeout: int = 0) -> asyncio.Future:
         """
