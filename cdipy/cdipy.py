@@ -27,17 +27,20 @@ class Message(msgspec.Struct):  # pylint: disable=too-few-public-methods
     params: typing.Any = None
     result: typing.Any = None
     error: MessageError = None
+    sessionId: str = None
 
 
 MSG_DECODER = msgspec.json.Decoder(type=Message)
 MSG_ENCODER = msgspec.json.Encoder()
 
 
-class DevtoolsEmitter(AsyncIOEventEmitter):
+class Devtools(AsyncIOEventEmitter):
     def __init__(self):
         super().__init__()
 
         self.loop = asyncio.get_running_loop()
+        self.futures = {}
+        self.counter = count()
 
     def wait_for(self, event: str, timeout: int = 0) -> asyncio.Future:
         """
@@ -54,14 +57,6 @@ class DevtoolsEmitter(AsyncIOEventEmitter):
 
         return future
 
-
-class Devtools(DevtoolsEmitter):
-    def __init__(self):
-        super().__init__()
-
-        self.futures = {}
-        self.counter = count()
-
     def __getattr__(self, attr: str):
         """
         Load each domain on demand
@@ -71,22 +66,11 @@ class Devtools(DevtoolsEmitter):
 
         return super().__getattribute__(attr)
 
-    def format_command(self, method: str, **kwargs) -> dict:
-        """
-        Convert method name + arguments to a devtools command
-        """
-        return {"id": next(self.counter), "method": method, "params": kwargs}
-
-    async def handle_message(self, message: str) -> None:
+    def _process_message(self, message_obj: Message) -> None:
         """
         Match incoming message ids to self.futures
         Emit events for incoming methods
         """
-        try:
-            message_obj = MSG_DECODER.decode(message)
-        except msgspec.DecodeError:
-            message_obj = Message(**json.loads(message))
-
         if message_obj.id is not None:
             future = self.futures.pop(message_obj.id)
             if not future.cancelled():
@@ -108,14 +92,13 @@ class Devtools(DevtoolsEmitter):
         """
         Called by the add_command wrapper with the method name and validated arguments
         """
-        command = self.format_command(method, **kwargs)
+        cmd_id = next(self.counter)
+        future = self.loop.create_future()
+        self.futures[cmd_id] = future
 
-        result_future = self.loop.create_future()
-        self.futures[command["id"]] = result_future
+        await self.send({"id": cmd_id, "method": method, "params": kwargs})
 
-        await self.send(command)
-
-        return await result_future
+        return await future
 
     async def send(self, command):
         raise NotImplementedError
@@ -128,6 +111,7 @@ class ChromeDevTools(Devtools):
         self.task: asyncio.Future | None = None
         self.ws_uri: str | None = websocket_uri
         self.websocket: websockets.asyncio.connection.Connection = None
+        self.sessions: dict[str, ChromeDevToolsTarget] = {}
 
     def __del__(self):
         if task := getattr(self, "task", None):
@@ -154,43 +138,29 @@ class ChromeDevTools(Devtools):
                 LOGGER.error("Websocket connection closed")
                 break
 
-            await self.handle_message(recv_data)
+            try:
+                message_obj = MSG_DECODER.decode(recv_data)
+            except msgspec.DecodeError:
+                message_obj = Message(**json.loads(recv_data))
+
+            if message_obj.sessionId in self.sessions:
+                self.sessions[message_obj.sessionId]._process_message(message_obj)
+            else:
+                self._process_message(message_obj)
 
     async def send(self, command: dict) -> None:
         LOGGER.debug("send: %s", command)
         await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
 
-class ChromeDevToolsTarget(Devtools):  # pylint: disable=abstract-method
+class ChromeDevToolsTarget(Devtools):
     def __init__(self, devtools: ChromeDevTools, session: str):
         super().__init__()
 
         self.devtools = devtools
-        self.devtools.on("Target.receivedMessageFromTarget", self._target_recv)
-
+        self.devtools.sessions[session] = self
         self.session = session
 
-    async def _target_recv(
-        self, sessionId, message, **_
-    ):  # pylint: disable=invalid-name
-        if sessionId != self.session:
-            return
-
-        await self.handle_message(message)
-
-    async def execute_method(self, method: str, **kwargs):
-        """
-        Target commands are in the same format, but sent as a parameter to
-        the sendMessageToTarget method
-        """
-        command = self.format_command(method, **kwargs)
-
-        result_future = self.loop.create_future()
-        self.futures[command["id"]] = result_future
-
-        message = MSG_ENCODER.encode(command).decode()
-        await self.devtools.Target.sendMessageToTarget(
-            message=message, sessionId=self.session
-        )
-
-        return await result_future
+    async def send(self, command: dict) -> None:
+        command["sessionId"] = self.session
+        await self.devtools.send(command)
