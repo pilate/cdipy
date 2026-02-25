@@ -182,8 +182,8 @@ class ChromeDevTools(Devtools):
             except msgspec.DecodeError:
                 message_obj = Message(**json.loads(recv_data))
 
-            if message_obj.sessionId in self.sessions:
-                self.sessions[message_obj.sessionId]._process_message(message_obj)
+            if target := self.sessions.get(message_obj.sessionId):
+                target._process_message(message_obj)
             else:
                 self._process_message(message_obj)
 
