@@ -171,8 +171,6 @@ class ChromeDevTools(Devtools):
         while True:
             try:
                 recv_data = await self.websocket.recv(decode=None)
-                LOGGER.debug("recv: %s", recv_data)
-
             except websockets.exceptions.ConnectionClosed:
                 LOGGER.error("Websocket connection closed")
                 break
@@ -188,7 +186,6 @@ class ChromeDevTools(Devtools):
                 self._process_message(message_obj)
 
     async def send(self, command: Command) -> None:
-        LOGGER.debug("send: %s", command)
         await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
 
