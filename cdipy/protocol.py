@@ -57,11 +57,12 @@ def add_command(domain_class, command):
 
     if SKIP_VALIDATION:
         async def wrapper(self, **kwargs):
-            return await self.devtools.execute_method(command_str, **kwargs)
+            return await self.devtools.execute_method(command_str, kwargs)
     else:
         async def wrapper(self, **kwargs):
-            kwargs = signature.bind(**kwargs).arguments
-            return await self.devtools.execute_method(command_str, **kwargs)
+            return await self.devtools.execute_method(
+                command_str, dict(signature.bind(**kwargs).arguments)
+            )
 
     wrapper.__name__ = wrapper.__qualname__ = command_str
 

@@ -40,13 +40,13 @@ class EventEmitter:
                 if not entries:
                     del mapping[event]
 
-    def emit(self, event, *args, **kwargs):
+    def emit(self, event, **kwargs):
         listeners = self._listeners.get(event, ())
         once = self._once_listeners.pop(event, ())
         for listener in listeners:
-            self.loop.create_task(listener(*args, **kwargs))
+            self.loop.create_task(listener(**kwargs))
         for listener in once:
-            self.loop.create_task(listener(*args, **kwargs))
+            self.loop.create_task(listener(**kwargs))
 
 
 class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
@@ -87,8 +87,8 @@ class Devtools(EventEmitter):
         """
         future = self.loop.create_future()
 
-        async def update_future(*args, **kwargs):
-            future.set_result((args, kwargs))
+        async def update_future(**kwargs):
+            future.set_result(kwargs)
 
         self.once(event, update_future)
         if timeout:
@@ -119,7 +119,10 @@ class Devtools(EventEmitter):
                     future.set_result(message_obj.result)
 
         elif message_obj.method:
-            self.emit(message_obj.method, **(message_obj.params or {}))
+            if message_obj.params:
+                self.emit(message_obj.method, **message_obj.params)
+            else:
+                self.emit(message_obj.method)
 
         elif message_obj.error:
             raise ResponseErrorException(message_obj.error.message)
@@ -127,7 +130,7 @@ class Devtools(EventEmitter):
         else:
             raise UnknownMessageException(f"Unknown message format: {message_obj}")
 
-    async def execute_method(self, method: str, **kwargs) -> dict:
+    async def execute_method(self, method: str, params: dict) -> dict:
         """
         Called by the add_command wrapper with the method name and validated arguments
         """
@@ -135,7 +138,7 @@ class Devtools(EventEmitter):
         future = self.loop.create_future()
         self.futures[cmd_id] = future
 
-        await self.send(Command(id=cmd_id, method=method, params=kwargs))
+        await self.send(Command(id=cmd_id, method=method, params=params))
 
         return await future
 
@@ -197,13 +200,13 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools.sessions[session] = self
         self.session = session
 
-    async def execute_method(self, method: str, **kwargs) -> dict:
+    async def execute_method(self, method: str, params: dict) -> dict:
         cmd_id = next(self.counter)
         future = self.loop.create_future()
         self.futures[cmd_id] = future
 
         await self.devtools.send(
-            Command(id=cmd_id, method=method, params=kwargs, sessionId=self.session)
+            Command(id=cmd_id, method=method, params=params, sessionId=self.session)
         )
 
         return await future
