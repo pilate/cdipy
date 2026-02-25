@@ -24,9 +24,13 @@ class EventEmitter:
         self._once_listeners = {}
 
     def on(self, event, listener):
+        if not asyncio.iscoroutinefunction(listener):
+            raise TypeError(f"{listener!r} must be a coroutine function")
         self._listeners.setdefault(event, []).append(listener)
 
     def once(self, event, listener):
+        if not asyncio.iscoroutinefunction(listener):
+            raise TypeError(f"{listener!r} must be a coroutine function")
         self._once_listeners.setdefault(event, []).append(listener)
 
     def off(self, event, listener):
@@ -39,10 +43,10 @@ class EventEmitter:
     def emit(self, event, *args, **kwargs):
         listeners = self._listeners.get(event, ())
         once = self._once_listeners.pop(event, ())
-        for listener in (*listeners, *once):
-            result = listener(*args, **kwargs)
-            if asyncio.iscoroutine(result):
-                self.loop.create_task(result)
+        for listener in listeners:
+            self.loop.create_task(listener(*args, **kwargs))
+        for listener in once:
+            self.loop.create_task(listener(*args, **kwargs))
 
 
 class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
@@ -55,6 +59,13 @@ class Message(msgspec.Struct):  # pylint: disable=too-few-public-methods
     params: typing.Any = None
     result: typing.Any = None
     error: MessageError = None
+    sessionId: str = None
+
+
+class Command(msgspec.Struct, omit_defaults=True):  # pylint: disable=too-few-public-methods
+    id: int
+    method: str
+    params: dict
     sessionId: str = None
 
 
@@ -76,7 +87,7 @@ class Devtools(EventEmitter):
         """
         future = self.loop.create_future()
 
-        def update_future(*args, **kwargs):
+        async def update_future(*args, **kwargs):
             future.set_result((args, kwargs))
 
         self.once(event, update_future)
@@ -124,11 +135,11 @@ class Devtools(EventEmitter):
         future = self.loop.create_future()
         self.futures[cmd_id] = future
 
-        await self.send({"id": cmd_id, "method": method, "params": kwargs})
+        await self.send(Command(id=cmd_id, method=method, params=kwargs))
 
         return await future
 
-    async def send(self, command):
+    async def send(self, command: Command):
         raise NotImplementedError
 
 
@@ -176,7 +187,7 @@ class ChromeDevTools(Devtools):
             else:
                 self._process_message(message_obj)
 
-    async def send(self, command: dict) -> None:
+    async def send(self, command: Command) -> None:
         LOGGER.debug("send: %s", command)
         await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
@@ -189,6 +200,6 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools.sessions[session] = self
         self.session = session
 
-    async def send(self, command: dict) -> None:
-        command["sessionId"] = self.session
+    async def send(self, command: Command) -> None:
+        command.sessionId = self.session
         await self.devtools.send(command)
