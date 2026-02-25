@@ -8,13 +8,53 @@ import msgspec
 import websockets.asyncio.client
 import websockets.asyncio.connection
 import websockets.exceptions
-from pyee.asyncio import AsyncIOEventEmitter
 
 from .exceptions import ResponseErrorException, UnknownMessageException
 from .protocol import DOMAINS
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
+
+
+class EventEmitter:
+    """Minimal event emitter replacing pyee.AsyncIOEventEmitter."""
+
+    def __init__(self):
+        self._listeners = {}
+
+    def on(self, event, listener):
+        self._listeners.setdefault(event, []).append((listener, False))
+        return self
+
+    def once(self, event, listener):
+        self._listeners.setdefault(event, []).append((listener, True))
+        return self
+
+    def off(self, event, listener):
+        if entries := self._listeners.get(event):
+            kept = [(l, o) for l, o in entries if l is not listener]
+            if kept:
+                self._listeners[event] = kept
+            else:
+                del self._listeners[event]
+
+    def emit(self, event, *args, **kwargs):
+        entries = self._listeners.get(event)
+        if not entries:
+            return
+        has_once = False
+        for listener, is_once in entries:
+            if is_once:
+                has_once = True
+            result = listener(*args, **kwargs)
+            if asyncio.iscoroutine(result):
+                self.loop.create_task(result)
+        if has_once:
+            kept = [(l, o) for l, o in entries if not o]
+            if kept:
+                self._listeners[event] = kept
+            else:
+                del self._listeners[event]
 
 
 class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
@@ -34,7 +74,7 @@ MSG_DECODER = msgspec.json.Decoder(type=Message)
 MSG_ENCODER = msgspec.json.Encoder()
 
 
-class Devtools(AsyncIOEventEmitter):
+class Devtools(EventEmitter):
     def __init__(self):
         super().__init__()
 
@@ -80,7 +120,7 @@ class Devtools(AsyncIOEventEmitter):
                     future.set_result(message_obj.result)
 
         elif message_obj.method:
-            self.emit(message_obj.method, **message_obj.params)
+            self.emit(message_obj.method, **(message_obj.params or {}))
 
         elif message_obj.error:
             raise ResponseErrorException(message_obj.error.message)

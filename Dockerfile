@@ -7,7 +7,7 @@ RUN apt-get update \
 &&  apt-get install -y fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg libxss1 libappindicator3-1 \
 &&  apt-get install -y bash
 
-RUN pip install 'aiohttp<3.14.0' 'msgspec<0.21.0' 'pyee<13.0.0' 'websockets<15.1'
+RUN pip install 'aiohttp<3.14.0' 'msgspec<0.21.0' 'websockets<15.1'
 
 RUN apt-get install -y --no-install-recommends wget gnupg2 \
 && wget -qO - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-keyring.gpg \
