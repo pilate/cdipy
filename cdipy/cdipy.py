@@ -98,7 +98,8 @@ class Devtools(EventEmitter):
         future = self.loop.create_future()
 
         async def update_future(**kwargs):
-            future.set_result(kwargs)
+            if not future.cancelled():
+                future.set_result(kwargs)
 
         self.once(event, update_future)
         if timeout:
