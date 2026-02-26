@@ -58,6 +58,7 @@ def add_command(domain_class, command):
     if SKIP_VALIDATION:
         async def wrapper(self, **kwargs):
             return await self.devtools.execute_method(command_str, kwargs)
+
     else:
         async def wrapper(self, **kwargs):
             return await self.devtools.execute_method(
