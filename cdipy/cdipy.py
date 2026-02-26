@@ -9,11 +9,7 @@ import websockets.asyncio.client
 import websockets.asyncio.connection
 import websockets.exceptions
 
-from .exceptions import (
-    ChromeClosedException,
-    ResponseErrorException,
-    UnknownMessageException,
-)
+from .exceptions import ChromeClosedException, ResponseErrorException
 from .protocol import DOMAINS
 
 
