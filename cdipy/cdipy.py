@@ -24,6 +24,7 @@ class EventEmitter:
     """Minimal event emitter replacing pyee.AsyncIOEventEmitter."""
 
     def __init__(self):
+        self.loop = asyncio.get_running_loop()
         self._listeners = {}
         self._once_listeners = {}
         self._tasks = set()
@@ -87,7 +88,6 @@ class Devtools(EventEmitter):
     def __init__(self):
         super().__init__()
 
-        self.loop = asyncio.get_running_loop()
         self.futures = {}
         self.counter = count()
 
@@ -209,13 +209,13 @@ class ChromeDevTools(Devtools):
         for future in all_futures:
             if not future.done():
                 future.set_exception(exc)
-                
+
         self.closed = True
 
     async def send(self, command: Command) -> None:
         if self.closed:
             raise ChromeClosedException("Websocket connection closed")
-        
+
         await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
 
