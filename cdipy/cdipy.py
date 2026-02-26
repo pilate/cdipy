@@ -116,19 +116,19 @@ class Devtools(EventEmitter):
         Match incoming message ids to self.futures
         Emit events for incoming methods
         """
-        if message_obj.id is not None:
+        if message_obj.method:
+            if message_obj.params:
+                self.emit(message_obj.method, **message_obj.params)
+            else:
+                self.emit(message_obj.method)
+
+        elif message_obj.id is not None:
             future = self.futures.pop(message_obj.id)
             if not future.cancelled():
                 if error := message_obj.error:
                     future.set_exception(ResponseErrorException(error.message))
                 else:
                     future.set_result(message_obj.result)
-
-        elif message_obj.method:
-            if message_obj.params:
-                self.emit(message_obj.method, **message_obj.params)
-            else:
-                self.emit(message_obj.method)
 
         elif message_obj.error:
             raise ResponseErrorException(message_obj.error.message)
