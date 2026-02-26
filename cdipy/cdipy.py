@@ -22,6 +22,7 @@ class EventEmitter:
     def __init__(self):
         self._listeners = {}
         self._once_listeners = {}
+        self._tasks = set()
 
     def on(self, event, listener):
         if not asyncio.iscoroutinefunction(listener):
@@ -43,10 +44,15 @@ class EventEmitter:
     def emit(self, event, **kwargs):
         listeners = self._listeners.get(event, ())
         once = self._once_listeners.pop(event, ())
-        for listener in listeners:
-            self.loop.create_task(listener(**kwargs))
-        for listener in once:
-            self.loop.create_task(listener(**kwargs))
+        for listener in (*listeners, *once):
+            task = self.loop.create_task(listener(**kwargs))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+
+    async def wait_for_complete(self):
+        """Wait for all pending handler tasks to finish."""
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
 
 
 class MessageError(msgspec.Struct):  # pylint: disable=too-few-public-methods
