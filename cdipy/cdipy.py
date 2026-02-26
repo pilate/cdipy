@@ -136,10 +136,10 @@ class Devtools(EventEmitter):
                     future.set_result(message_obj.result)
 
         elif message_obj.error:
-            raise ResponseErrorException(message_obj.error.message)
+            LOGGER.error("Protocol error: %s", message_obj.error.message)
 
         else:
-            raise UnknownMessageException(f"Unknown message format: {message_obj}")
+            LOGGER.error("Unknown message format: %s", message_obj)
 
     async def execute_method(self, method: str, params: dict) -> dict:
         """
