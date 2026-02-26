@@ -196,6 +196,8 @@ class ChromeDevTools(Devtools):
             else:
                 self.process_message(message_obj)
 
+        self.closed = True
+
         exc = ChromeClosedException("Websocket connection closed")
 
         all_futures = self.futures.values()
@@ -205,8 +207,6 @@ class ChromeDevTools(Devtools):
         for future in all_futures:
             if not future.done():
                 future.set_exception(exc)
-
-        self.closed = True
 
     async def send(self, command: Command) -> None:
         if self.closed:
