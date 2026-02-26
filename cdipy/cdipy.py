@@ -212,7 +212,11 @@ class ChromeDevTools(Devtools):
         if self.closed:
             raise ChromeClosedException("Websocket connection closed")
 
-        await self.websocket.send(MSG_ENCODER.encode(command), text=True)
+        try:
+            await self.websocket.send(MSG_ENCODER.encode(command), text=True)
+        except websockets.exceptions.ConnectionClosed:
+            self.closed = True
+            raise ChromeClosedException("Websocket connection closed")
 
 
 class ChromeDevToolsTarget(Devtools):
