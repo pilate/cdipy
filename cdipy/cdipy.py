@@ -9,7 +9,11 @@ import websockets.asyncio.client
 import websockets.asyncio.connection
 import websockets.exceptions
 
-from .exceptions import ResponseErrorException, UnknownMessageException
+from .exceptions import (
+    ChromeClosedException,
+    ResponseErrorException,
+    UnknownMessageException,
+)
 from .protocol import DOMAINS
 
 
@@ -111,7 +115,7 @@ class Devtools(EventEmitter):
 
         return super().__getattribute__(attr)
 
-    def _process_message(self, message_obj: Message) -> None:
+    def process_message(self, message_obj: Message) -> None:
         """
         Match incoming message ids to self.futures
         Emit events for incoming methods
@@ -160,6 +164,7 @@ class ChromeDevTools(Devtools):
         self.ws_uri: str | None = websocket_uri
         self.websocket: websockets.asyncio.connection.Connection = None
         self.sessions: dict[str, ChromeDevToolsTarget] = {}
+        self.closed = False
 
     def __del__(self):
         if task := getattr(self, "task", None):
@@ -190,11 +195,26 @@ class ChromeDevTools(Devtools):
                 message_obj = Message(**json.loads(recv_data))
 
             if target := self.sessions.get(message_obj.sessionId):
-                target._process_message(message_obj)
+                target.process_message(message_obj)
             else:
-                self._process_message(message_obj)
+                self.process_message(message_obj)
+
+        exc = ChromeClosedException("Websocket connection closed")
+
+        all_futures = self.futures.values()
+        for target in self.sessions.values():
+            all_futures = (*all_futures, *target.futures.values())
+
+        for future in all_futures:
+            if not future.done():
+                future.set_exception(exc)
+                
+        self.closed = True
 
     async def send(self, command: Command) -> None:
+        if self.closed:
+            raise ChromeClosedException("Websocket connection closed")
+        
         await self.websocket.send(MSG_ENCODER.encode(command), text=True)
 
 
