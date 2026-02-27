@@ -208,6 +208,13 @@ class ChromeDevTools(Devtools):
             if not future.done():
                 future.set_exception(exc)
 
+    async def close(self):
+        self.closed = True
+        if self.websocket:
+            await self.websocket.close()
+        if self.task and not self.task.done():
+            await self.task
+
     async def send(self, command: Command) -> None:
         if self.closed:
             raise ChromeClosedException("Websocket connection closed")
