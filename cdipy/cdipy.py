@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import typing
-from itertools import count
+from itertools import chain, count
 
 import msgspec
 import websockets.asyncio.client
@@ -17,41 +17,51 @@ LOGGER = logging.getLogger("cdipy.cdipy")
 
 
 class EventEmitter:
-    """Minimal event emitter replacing pyee.AsyncIOEventEmitter."""
+    """Minimal event emitter supporting both sync and async callbacks.
+
+    Listeners are stored as (callable, is_coro) tuples so the iscoroutinefunction
+    check happens once at registration, not on every emit call.
+    """
 
     def __init__(self):
         self.loop = asyncio.get_running_loop()
-        self._listeners = {}
-        self._once_listeners = {}
+        self._listeners = {}  # event -> [(cb, is_coro), ...]
+        self._once_listeners = {}  # event -> [(cb, is_coro), ...]
         self._tasks = set()
 
     def on(self, event, listener):
-        if not asyncio.iscoroutinefunction(listener):
-            raise TypeError(f"{listener!r} must be a coroutine function")
-        self._listeners.setdefault(event, []).append(listener)
+        is_coro = asyncio.iscoroutinefunction(listener)
+        self._listeners.setdefault(event, []).append((listener, is_coro))
 
     def once(self, event, listener):
-        if not asyncio.iscoroutinefunction(listener):
-            raise TypeError(f"{listener!r} must be a coroutine function")
-        self._once_listeners.setdefault(event, []).append(listener)
+        is_coro = asyncio.iscoroutinefunction(listener)
+        self._once_listeners.setdefault(event, []).append((listener, is_coro))
 
     def off(self, event, listener):
         for mapping in (self._listeners, self._once_listeners):
             if entries := mapping.get(event):
-                entries.remove(listener)
-                if not entries:
-                    del mapping[event]
+                for i, (cb, _) in enumerate(entries):
+                    if cb is listener:
+                        del entries[i]
+                        if not entries:
+                            del mapping[event]
+                        return
 
     def emit(self, event, **kwargs):
-        listeners = self._listeners.get(event, ())
         once = self._once_listeners.pop(event, ())
-        for listener in (*listeners, *once):
-            task = self.loop.create_task(listener(**kwargs))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+        for cb, is_coro in chain(self._listeners.get(event, ()), once):
+            if is_coro:
+                task = self.loop.create_task(cb(**kwargs))
+                self._tasks.add(task)
+                task.add_done_callback(self._tasks.discard)
+            else:
+                try:
+                    cb(**kwargs)
+                except Exception:
+                    LOGGER.exception("Error in sync listener for %s", event)
 
     async def wait_for_complete(self):
-        """Wait for all pending handler tasks to finish."""
+        """Wait for all pending async handler tasks to finish."""
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
 
