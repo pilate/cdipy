@@ -143,10 +143,10 @@ class Devtools(EventEmitter):
         """
         cmd_id = next(self.counter)
         future = self.loop.create_future()
-        self.futures[cmd_id] = future
 
         await self.send(Command(id=cmd_id, method=method, params=params))
 
+        self.futures[cmd_id] = future
         return await future
 
     async def send(self, command: Command):
@@ -230,10 +230,10 @@ class ChromeDevToolsTarget(Devtools):
     async def execute_method(self, method: str, params: dict) -> dict:
         cmd_id = next(self.counter)
         future = self.loop.create_future()
-        self.futures[cmd_id] = future
 
         await self.devtools.send(
             Command(id=cmd_id, method=method, params=params, sessionId=self.session)
         )
 
+        self.futures[cmd_id] = future
         return await future
