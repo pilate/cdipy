@@ -211,7 +211,7 @@ class ChromeDevTools(Devtools):
     async def close(self):
         self.closed = True
         if self.websocket:
-            await self.websocket.close()
+            self.websocket.transport.close()
         if self.task and not self.task.done():
             await self.task
 
