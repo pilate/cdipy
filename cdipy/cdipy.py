@@ -124,7 +124,10 @@ class Devtools(EventEmitter):
                 self.emit(message_obj.method)
 
         elif message_obj.id is not None:
-            future = self.futures.pop(message_obj.id)
+            future = self.futures.pop(message_obj.id, None)
+            if future is None:
+                return
+
             if not future.cancelled():
                 if error := message_obj.error:
                     future.set_exception(ResponseErrorException(error.message))
