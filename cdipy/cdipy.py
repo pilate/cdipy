@@ -91,6 +91,7 @@ class Devtools(EventEmitter):
 
         self.futures = {}
         self.counter = count()
+        self.session = None
 
     def wait_for(self, event: str, timeout: int = 0) -> asyncio.Future:
         """
@@ -152,7 +153,7 @@ class Devtools(EventEmitter):
         cmd_id = next(self.counter)
         future = self.loop.create_future()
 
-        await self.send(Command(id=cmd_id, method=method, params=params))
+        await self.send(Command(id=cmd_id, method=method, params=params, sessionId=self.session))
 
         self.futures[cmd_id] = future
         return await future
@@ -242,13 +243,5 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools.sessions[session] = self
         self.session = session
 
-    async def execute_method(self, method: str, params: dict) -> dict:
-        cmd_id = next(self.counter)
-        future = self.loop.create_future()
-
-        await self.devtools.send(
-            Command(id=cmd_id, method=method, params=params, sessionId=self.session)
-        )
-
-        self.futures[cmd_id] = future
-        return await future
+    async def send(self, command: Command) -> None:
+        await self.devtools.send(command)
