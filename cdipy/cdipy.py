@@ -42,13 +42,18 @@ class EventEmitter:
                 if not entries:
                     del mapping[event]
 
+    def _task_done(self, task):
+        self._tasks.discard(task)
+        if not task.cancelled() and (exc := task.exception()):
+            LOGGER.debug("Unhandled exception in event handler: %s", exc)
+
     def emit(self, event, **kwargs):
         listeners = self._listeners.get(event, ())
         once = self._once_listeners.pop(event, ())
         for listener in (*listeners, *once):
             task = self.loop.create_task(listener(**kwargs))
             self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+            task.add_done_callback(self._task_done)
 
     async def wait_for_complete(self):
         """Wait for all pending handler tasks to finish."""
