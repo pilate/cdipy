@@ -73,3 +73,13 @@ if __name__ == "__main__":
 
 
 ```
+
+### Skipping Parameter Validation
+
+By default, cdipy validates the parameters you pass to CDP commands against the protocol definition. To skip this validation, set the `CDIPY_SKIP_VALIDATION` environment variable:
+
+```bash
+export CDIPY_SKIP_VALIDATION=1
+```
+
+This passes your keyword arguments directly to the protocol without checking them against the command signature. Useful if the cached protocol definition is out of date or you want to avoid the overhead of signature binding.
