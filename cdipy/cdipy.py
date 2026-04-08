@@ -146,15 +146,18 @@ class Devtools(EventEmitter):
         else:
             LOGGER.error("Unknown message format: %s", message_obj)
 
-    async def execute_method(self, method: str, params: dict) -> dict:
+    async def execute_method(self, method: str, params: dict, wait: bool = True) -> dict:
         """
         Called by the add_command wrapper with the method name and validated arguments
         """
         cmd_id = next(self.counter)
-        future = self.loop.create_future()
 
         await self.send(Command(id=cmd_id, method=method, params=params, sessionId=self.session))
 
+        if not wait:
+            return
+
+        future = self.loop.create_future()
         self.futures[cmd_id] = future
         return await future
 
