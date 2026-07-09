@@ -39,7 +39,8 @@ class EventEmitter:
     def off(self, event, listener):
         for mapping in (self._listeners, self._once_listeners):
             if entries := mapping.get(event):
-                entries.remove(listener)
+                if listener in entries:
+                    entries.remove(listener)
                 if not entries:
                     del mapping[event]
 
@@ -105,6 +106,11 @@ class Devtools(EventEmitter):
                 future.set_result(kwargs)
 
         self.once(event, update_future)
+
+        # Unregister the listener when the future is cancelled (ex: timeout);
+        # a no-op when the event fired normally
+        future.add_done_callback(lambda _: self.off(event, update_future))
+
         if timeout:
             return asyncio.wait_for(future, timeout)
 
