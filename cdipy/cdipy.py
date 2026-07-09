@@ -153,14 +153,22 @@ class Devtools(EventEmitter):
         """
         cmd_id = next(self.counter)
 
-        await self.send(Command(id=cmd_id, method=method, params=params, sessionId=self.session))
+        if wait:
+            future = self.futures[cmd_id] = self.loop.create_future()
 
-        if not wait:
-            return
+        command = Command(id=cmd_id, method=method, params=params, sessionId=self.session)
 
-        future = self.loop.create_future()
-        self.futures[cmd_id] = future
-        return await future
+        try:
+            await self.send(command)
+            
+        except BaseException:
+            self.futures.pop(cmd_id, None)
+            raise
+
+        if wait:
+            return await future
+        
+        return None
 
     async def send(self, command: Command):
         raise NotImplementedError
