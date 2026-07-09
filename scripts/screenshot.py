@@ -51,6 +51,9 @@ async def async_main(url):
 
     LOGGER.info("wrote %s", FILENAME)
 
+    # Disconnect from devtools; chrome is killed when the runner is collected
+    await cdi.close()
+
 
 def main():
     logging.basicConfig(level=logging.INFO)

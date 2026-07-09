@@ -160,7 +160,7 @@ class Devtools(EventEmitter):
 
         try:
             await self.send(command)
-            
+
         except BaseException:
             self.futures.pop(cmd_id, None)
             raise
@@ -200,34 +200,49 @@ class ChromeDevTools(Devtools):
         self.task = asyncio.create_task(self._recv_loop())
 
     async def _recv_loop(self):
-        while True:
-            try:
-                recv_data = await self.websocket.recv(decode=None)
-            except websockets.exceptions.ConnectionClosed:
-                LOGGER.error("Websocket connection closed")
-                break
+        try:
+            while True:
+                try:
+                    recv_data = await self.websocket.recv(decode=None)
+                except websockets.exceptions.ConnectionClosed:
+                    LOGGER.error("Websocket connection closed")
+                    break
 
-            try:
-                message_obj = MSG_DECODER.decode(recv_data)
-            except msgspec.DecodeError:
-                message_obj = Message(**json.loads(recv_data))
+                try:
+                    message_obj = MSG_DECODER.decode(recv_data)
+                except msgspec.DecodeError:
+                    # msgspec rejects escaped lone surrogates (chrome sends them in
+                    # postData), but the stdlib json parser accepts them
+                    try:
+                        message_obj = msgspec.convert(json.loads(recv_data), Message)
+                    except (
+                        json.JSONDecodeError,
+                        UnicodeDecodeError,
+                        msgspec.ValidationError,
+                    ):
+                        LOGGER.exception("Failed to decode message: %.512s", recv_data)
+                        continue
 
-            if target := self.sessions.get(message_obj.sessionId):
-                target.process_message(message_obj)
-            else:
-                self.process_message(message_obj)
+                try:
+                    if target := self.sessions.get(message_obj.sessionId):
+                        target.process_message(message_obj)
+                    else:
+                        self.process_message(message_obj)
+                except Exception:  # pylint: disable=broad-except
+                    LOGGER.exception("Error processing message: %.512s", recv_data)
 
-        self.closed = True
+        finally:
+            self.closed = True
 
-        exc = ChromeClosedException("Websocket connection closed")
+            exc = ChromeClosedException("Websocket connection closed")
 
-        all_futures = self.futures.values()
-        for target in self.sessions.values():
-            all_futures = (*all_futures, *target.futures.values())
+            all_futures = self.futures.values()
+            for target in self.sessions.values():
+                all_futures = (*all_futures, *target.futures.values())
 
-        for future in all_futures:
-            if not future.done():
-                future.set_exception(exc)
+            for future in all_futures:
+                if not future.done():
+                    future.set_exception(exc)
 
     async def close(self):
         self.closed = True
