@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import os
-import re
 import signal
 from asyncio import subprocess
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from .exceptions import ChromeClosedException
@@ -46,11 +46,13 @@ CHROME_PARAMS = [
     "--disable-gpu",
     "--hide-scrollbars",
     "--mute-audio",
+    # only log FATAL to cut console-echo spam; log-level is only honored
+    # when the logging destination is set explicitly
+    "--enable-logging=stderr",
+    "--log-level=3",
 ]
 if not os.environ.get("CDIPY_USE_SHM"):
     CHROME_PARAMS.append("--disable-dev-shm-usage")
-
-WS_RE = re.compile(r"listening on (ws://[^ ]*)")
 
 
 class ChromeRunner:
@@ -82,6 +84,7 @@ class ChromeRunner:
         chrome_path: str = CHROME_PATH,
         extra_args: list = None,
         headless: str = "new",
+        log_output: bool = False,
     ) -> None:
         command = [
             chrome_path,
@@ -96,27 +99,47 @@ class ChromeRunner:
         if self.proxy:
             command.append(f"--proxy-server={self.proxy}")
 
-        self.proc = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            preexec_fn=os.setsid,
-        )
+        # Discard chrome's output by default; never use a pipe, an unread
+        # pipe eventually fills and blocks chrome entirely
+        output = subprocess.DEVNULL
+        if log_output:
+            output = open(os.path.join(self.data_dir.name, "chrome.log"), "wb")
 
-        output = ""
+        try:
+            self.proc = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                preexec_fn=os.setsid,
+            )
+        finally:
+            if log_output:
+                output.close()
+
+        # Chrome writes the devtools port and browser target path to
+        # DevToolsActivePort in the data dir once the listener is ready
+        port_path = Path(self.data_dir.name) / "DevToolsActivePort"
         while True:
+            # the average time chrome was observed to take (46-54ms)
+            await asyncio.sleep(0.05)
+
             if self.proc.returncode is not None:
-                stderr = await self.proc.stdout.read()
+                log_tail = ""
+                if log_output:
+                    with open(output.name, "rb") as log_file:
+                        log_file.seek(0, os.SEEK_END)
+                        log_file.seek(max(log_file.tell() - 2048, 0))
+                        log_tail = log_file.read()
+
                 raise ChromeClosedException(
-                    f"Chrome closed unexpectedly; code: {self.proc.returncode} ({stderr})"
+                    f"Chrome closed unexpectedly; code: {self.proc.returncode} ({log_tail})"
                 )
 
-            data = await self.proc.stdout.readline()
-            output += data.decode()
-
-            search = WS_RE.search(output)
-            if search:
+            try:
+                port, browser_path = port_path.read_text().splitlines()[:2]
                 break
+            except (FileNotFoundError, ValueError):
+                pass
 
-        self.websocket_uri = search.group(1).strip()
+        self.websocket_uri = f"ws://127.0.0.1:{port}{browser_path}"
         LOGGER.info("Parsed websocket URI: %s", self.websocket_uri)
