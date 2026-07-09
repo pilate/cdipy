@@ -1,5 +1,3 @@
-import asyncio
-import inspect
 import os
 import types
 
@@ -22,30 +20,6 @@ class DomainBase:  # pylint: disable=too-few-public-methods
         self.devtools = devtools
 
 
-def params_to_signature(params):
-    """
-    Creates a function signature based on a list of protocol parameters
-    """
-    new_params = []
-
-    for param in params:
-        default = inspect.Parameter.empty
-        if param.get("optional"):
-            default = None
-
-        new_param = inspect.Parameter(
-            name=param["name"],
-            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            default=default,
-        )
-
-        new_params.append(new_param)
-
-    new_params.sort(key=lambda p: bool(p.default), reverse=True)
-
-    return inspect.Signature(parameters=new_params)
-
-
 def add_command(domain_class, command):
     """
     Creates a new function that can be used as a domain method
@@ -53,7 +27,11 @@ def add_command(domain_class, command):
     command_name = command["name"]
     command_str = f"{domain_class.__name__}.{command_name}"
 
-    signature = params_to_signature(command.get("parameters", []))
+    parameters = command.get("parameters", [])
+    valid_params = frozenset(param["name"] for param in parameters)
+    required_params = frozenset(
+        param["name"] for param in parameters if not param.get("optional")
+    )
 
     if SKIP_VALIDATION:
         async def wrapper(self, **kwargs):
@@ -63,9 +41,15 @@ def add_command(domain_class, command):
     else:
         async def wrapper(self, **kwargs):
             wait = kwargs.pop("_wait", True)
-            return await self.devtools.execute_method(
-                command_str, dict(signature.bind(**kwargs).arguments), wait=wait
-            )
+            if missing := required_params - kwargs.keys():
+                raise TypeError(
+                    f"{command_str}() missing required arguments: {', '.join(sorted(missing))}"
+                )
+            if unexpected := kwargs.keys() - valid_params:
+                raise TypeError(
+                    f"{command_str}() got unexpected arguments: {', '.join(sorted(unexpected))}"
+                )
+            return await self.devtools.execute_method(command_str, kwargs, wait=wait)
 
     wrapper.__name__ = wrapper.__qualname__ = command_str
 
