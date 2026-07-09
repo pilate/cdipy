@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import logging
 import typing
@@ -26,12 +27,12 @@ class EventEmitter:
         self._tasks = set()
 
     def on(self, event, listener):
-        if not asyncio.iscoroutinefunction(listener):
+        if not inspect.iscoroutinefunction(listener):
             raise TypeError(f"{listener!r} must be a coroutine function")
         self._listeners.setdefault(event, []).append(listener)
 
     def once(self, event, listener):
-        if not asyncio.iscoroutinefunction(listener):
+        if not inspect.iscoroutinefunction(listener):
             raise TypeError(f"{listener!r} must be a coroutine function")
         self._once_listeners.setdefault(event, []).append(listener)
 
