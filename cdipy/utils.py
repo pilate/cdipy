@@ -1,9 +1,7 @@
-import asyncio
 import logging
 import os
+import urllib.request
 from pathlib import Path
-
-import aiohttp
 
 
 LOGGER = logging.getLogger("cdipy.utils")
@@ -35,19 +33,20 @@ def get_cache_path() -> Path:
     return Path(full_path)
 
 
-async def update_protocol_data() -> None:
+def update_protocol_data() -> None:
     """
     Download latest protocol definition
     """
-    async with aiohttp.ClientSession() as session:
-        requests = []
-        for url in SOURCE_FILES:
-            LOGGER.warning("Downloading %s", url)
-            requests.append(session.get(url))
+    for url in SOURCE_FILES:
+        LOGGER.warning("Downloading %s", url)
+        with urllib.request.urlopen(url) as response:
+            data = response.read()
 
-        responses = await asyncio.gather(*requests)
-        for response in responses:
-            new_path = get_cache_path() / response.url.name
-            with open(new_path, "w+b") as fp:
-                fp.write(await response.read())
-            LOGGER.warning("Wrote %s", new_path)
+        new_path = get_cache_path() / url.rsplit("/", 1)[1]
+
+        # Write to a temp name and rename so a partial download can never
+        # be mistaken for a valid cache file
+        tmp_path = new_path.with_suffix(".tmp")
+        tmp_path.write_bytes(data)
+        tmp_path.replace(new_path)
+        LOGGER.warning("Wrote %s", new_path)

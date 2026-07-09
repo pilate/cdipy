@@ -60,13 +60,16 @@ def load_domains():
     cache_path = get_cache_path()
 
     if not os.path.exists(cache_path):
-        os.makedirs(cache_path, mode=0o744)
+        os.makedirs(cache_path, mode=0o755)
 
-    if not os.listdir(cache_path):
-        asyncio.get_event_loop().run_until_complete(update_protocol_data())
+    if not any(name.endswith(".json") for name in os.listdir(cache_path)):
+        update_protocol_data()
 
     domains = {}
     for filename in os.listdir(cache_path):
+        if not filename.endswith(".json"):
+            continue
+
         with open(cache_path / filename, "rb") as fp:
             data = msgspec.json.decode(fp.read())
 
