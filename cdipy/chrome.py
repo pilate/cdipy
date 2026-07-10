@@ -57,14 +57,27 @@ if not os.environ.get("CDIPY_USE_SHM"):
 
 
 class ChromeRunner:
-    def __init__(self, proxy: str = None, ignore_cleanup_errors=False):
+    def __init__(
+        self,
+        proxy: str = None,
+        ignore_cleanup_errors=False,
+        data_dir: str | os.PathLike = None,
+    ):
         super().__init__()
 
         self.proxy = proxy
 
-        self.data_dir = TemporaryDirectory(
-            ignore_cleanup_errors=ignore_cleanup_errors
-        )  # pylint: disable=consider-using-with
+        if data_dir:
+            # user-specified dirs are created if needed and never deleted,
+            # so logs and profile data survive the run
+            os.makedirs(data_dir, exist_ok=True)
+            self._tempdir = None
+            self.data_dir = str(data_dir)
+        else:
+            self._tempdir = TemporaryDirectory(
+                ignore_cleanup_errors=ignore_cleanup_errors
+            )  # pylint: disable=consider-using-with
+            self.data_dir = self._tempdir.name
 
         self.proc = None
         self.websocket_uri = None
@@ -94,7 +107,7 @@ class ChromeRunner:
             chrome_path,
             *CHROME_PARAMS,
             f"--headless={headless}",
-            f"--user-data-dir={self.data_dir.name}",
+            f"--user-data-dir={self.data_dir}",
         ]
 
         if extra_args:
@@ -103,11 +116,17 @@ class ChromeRunner:
         if self.proxy:
             command.append(f"--proxy-server={self.proxy}")
 
+        # user-supplied dirs and relaunches may hold a stale port file
+        # from a previous chrome
+        port_path = Path(self.data_dir) / "DevToolsActivePort"
+        if not self._tempdir or self.proc:
+            port_path.unlink(missing_ok=True)
+
         # Discard chrome's output by default; never use a pipe, an unread
         # pipe eventually fills and blocks chrome entirely
         output = subprocess.DEVNULL
         if log_output:
-            output = open(os.path.join(self.data_dir.name, "chrome.log"), "wb")
+            output = open(os.path.join(self.data_dir, "chrome.log"), "wb")
 
         try:
             self.proc = await asyncio.create_subprocess_exec(
@@ -122,7 +141,6 @@ class ChromeRunner:
 
         # Chrome writes the devtools port and browser target path to
         # DevToolsActivePort in the data dir once the listener is ready
-        port_path = Path(self.data_dir.name) / "DevToolsActivePort"
         deadline = time.monotonic() + timeout
         while True:
             # the average time chrome was observed to take (46-54ms)
