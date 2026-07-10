@@ -124,33 +124,58 @@ MSG_ENCODER = msgspec.json.Encoder()
 
 
 class Devtools(EventEmitter):
+    closed = False
+
     def __init__(self):
         super().__init__()
 
         self.futures = {}
         self.counter = count()
         self.session = None
+        self.waiters = set()
 
-    def wait_for(self, event: str, timeout: int = 0) -> asyncio.Future:
+    def wait_for(self, event: str, timeout: float = 0) -> asyncio.Future:
         """
         Wait for a specific event to fire before returning
         """
+        if self.closed:
+            raise ChromeClosedException("Websocket connection closed")
+
         future = self.loop.create_future()
 
         def update_future(**kwargs):
-            if not future.cancelled():
+            if not future.done():
                 future.set_result(kwargs)
 
         self.once(event, update_future)
+        self.waiters.add(future)
 
-        # Unregister the listener when the future is cancelled (ex: timeout);
-        # a no-op when the event fired normally
-        future.add_done_callback(lambda _: self.off(event, update_future))
+        # Unregister the listener when the future is cancelled (ex: timeout)
+        # or fails because the connection closed; a no-op when the event
+        # fired normally
+        def cleanup(_):
+            self.waiters.discard(future)
+            self.off(event, update_future)
+
+        future.add_done_callback(cleanup)
 
         if timeout:
             return asyncio.wait_for(future, timeout)
 
         return future
+
+    def fail_pending(self, exc: Exception) -> None:
+        """
+        Fail all in-flight command futures and event waiters
+        """
+        # snapshot: failing a waiter runs its done callback,
+        # which mutates the set we are iterating
+        pending = (*self.futures.values(), *self.waiters)
+        self.futures.clear()
+
+        for future in pending:
+            if not future.done():
+                future.set_exception(exc)
 
     def __getattr__(self, attr: str):
         """
@@ -232,6 +257,14 @@ class ChromeDevTools(Devtools):
         if task := getattr(self, "task", None):
             task.cancel()
 
+    def evict_session(self, session_id: str) -> None:
+        """
+        Stop tracking a session and fail anything pending on it
+        """
+        if target := self.sessions.pop(session_id, None):
+            target.detached = True
+            target.fail_pending(ChromeClosedException("Session detached"))
+
     async def connect(self, compression: str | None = None) -> None:
         self.websocket = await websockets.asyncio.client.connect(
             self.ws_uri,
@@ -249,7 +282,8 @@ class ChromeDevTools(Devtools):
                 try:
                     recv_data = await self.websocket.recv(decode=None)
                 except websockets.exceptions.ConnectionClosed:
-                    LOGGER.error("Websocket connection closed")
+                    if not self.closed:
+                        LOGGER.error("Websocket connection closed")
                     break
 
                 try:
@@ -268,10 +302,19 @@ class ChromeDevTools(Devtools):
                         continue
 
                 try:
-                    if target := self.sessions.get(message_obj.sessionId):
+                    if not (session_id := message_obj.sessionId):
+                        self.process_message(message_obj)
+                    elif target := self.sessions.get(session_id):
                         target.process_message(message_obj)
                     else:
-                        self.process_message(message_obj)
+                        # don't let messages for detached/unknown sessions
+                        # resolve browser-scope futures with matching ids
+                        LOGGER.debug("Message for unknown session: %.512s", recv_data)
+
+                    # detach events can arrive on any scope; evicting here
+                    # covers them all
+                    if message_obj.method == "Target.detachedFromTarget":
+                        self.evict_session((message_obj.params or {}).get("sessionId"))
                 except Exception:  # pylint: disable=broad-except
                     LOGGER.exception("Error processing message: %.512s", recv_data)
 
@@ -280,13 +323,10 @@ class ChromeDevTools(Devtools):
 
             exc = ChromeClosedException("Websocket connection closed")
 
-            all_futures = self.futures.values()
-            for target in self.sessions.values():
-                all_futures = (*all_futures, *target.futures.values())
+            for devtools in (self, *self.sessions.values()):
+                devtools.fail_pending(exc)
 
-            for future in all_futures:
-                if not future.done():
-                    future.set_exception(exc)
+            self.sessions.clear()
 
     async def close(self):
         self.closed = True
@@ -313,6 +353,25 @@ class ChromeDevToolsTarget(Devtools):
         self.devtools = devtools
         self.devtools.sessions[session] = self
         self.session = session
+        self.detached = False
+
+    @property
+    def closed(self) -> bool:
+        return self.detached or self.devtools.closed
+
+    async def detach(self) -> None:
+        """
+        Detach from the target and stop tracking this session
+        """
+        try:
+            await self.devtools.Target.detachFromTarget(sessionId=self.session)
+        finally:
+            self.devtools.evict_session(self.session)
 
     async def send(self, command: Command) -> None:
+        # chrome responses for detached sessions are dropped by the recv
+        # loop, so a command sent now would never resolve
+        if self.detached:
+            raise ChromeClosedException("Session detached")
+
         await self.devtools.send(command)
