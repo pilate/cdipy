@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import signal
+import time
 from asyncio import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -68,16 +69,18 @@ class ChromeRunner:
         self.proc = None
         self.websocket_uri = None
 
-    def __del__(self):
+    def kill(self):
         """
         Kill the chrome we launched and all child processes
         """
-
         if self.proc and self.proc.pid:
             try:
                 os.killpg(os.getpgid(self.proc.pid), signal.SIGKILL)
             except ProcessLookupError:
                 pass
+
+    def __del__(self):
+        self.kill()
 
     async def launch(
         self,
@@ -85,6 +88,7 @@ class ChromeRunner:
         extra_args: list = None,
         headless: str = "new",
         log_output: bool = False,
+        timeout: float = 30,
     ) -> None:
         command = [
             chrome_path,
@@ -119,9 +123,16 @@ class ChromeRunner:
         # Chrome writes the devtools port and browser target path to
         # DevToolsActivePort in the data dir once the listener is ready
         port_path = Path(self.data_dir.name) / "DevToolsActivePort"
+        deadline = time.monotonic() + timeout
         while True:
             # the average time chrome was observed to take (46-54ms)
             await asyncio.sleep(0.05)
+
+            if time.monotonic() > deadline:
+                self.kill()
+                raise ChromeClosedException(
+                    f"Chrome did not write DevToolsActivePort within {timeout}s"
+                )
 
             if self.proc.returncode is not None:
                 log_tail = ""
