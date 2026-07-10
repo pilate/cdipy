@@ -1,3 +1,40 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdipy"
+version = "0.5.0"
+description = "An async Python interface for Chrome Devtools"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.md"]
+authors = [{ name = "Pilate", email = "pilate@pilate.es" }]
+requires-python = ">=3.10"
+dependencies = [
+    "msgspec>=0.18,<0.21.0",
+    "websockets>=14.1,<17",
+]
+keywords = ["chrome", "devtools", "cdp", "headless", "automation"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+]
+
+[project.urls]
+Homepage = "https://github.com/pilate/cdipy"
+Issues = "https://github.com/pilate/cdipy/issues"
+
+[tool.setuptools.packages.find]
+include = ["cdipy*"]
+
+[tool.setuptools.package-data]
+cdipy = ["py.typed"]
