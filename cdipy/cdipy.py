@@ -18,7 +18,12 @@ LOGGER = logging.getLogger("cdipy.cdipy")
 
 
 class EventEmitter:
-    """Minimal event emitter replacing pyee.AsyncIOEventEmitter."""
+    """
+    Minimal event emitter replacing pyee.AsyncIOEventEmitter.
+
+    Listeners may be plain callables or coroutine functions; plain callables
+    run inline during emit(), coroutine functions are scheduled as tasks.
+    """
 
     def __init__(self):
         self.loop = asyncio.get_running_loop()
@@ -26,21 +31,26 @@ class EventEmitter:
         self._once_listeners = {}
         self._tasks = set()
 
+    @staticmethod
+    def _add(mapping, event, listener):
+        if not callable(listener):
+            raise TypeError(f"{listener!r} must be callable")
+        entry = (listener, inspect.iscoroutinefunction(listener))
+        mapping.setdefault(event, []).append(entry)
+
     def on(self, event, listener):
-        if not inspect.iscoroutinefunction(listener):
-            raise TypeError(f"{listener!r} must be a coroutine function")
-        self._listeners.setdefault(event, []).append(listener)
+        self._add(self._listeners, event, listener)
 
     def once(self, event, listener):
-        if not inspect.iscoroutinefunction(listener):
-            raise TypeError(f"{listener!r} must be a coroutine function")
-        self._once_listeners.setdefault(event, []).append(listener)
+        self._add(self._once_listeners, event, listener)
+
+    def has_listeners(self, event) -> bool:
+        return event in self._listeners or event in self._once_listeners
 
     def off(self, event, listener):
         for mapping in (self._listeners, self._once_listeners):
             if entries := mapping.get(event):
-                if listener in entries:
-                    entries.remove(listener)
+                entries[:] = [entry for entry in entries if entry[0] != listener]
                 if not entries:
                     del mapping[event]
 
@@ -49,13 +59,39 @@ class EventEmitter:
         if not task.cancelled() and (exc := task.exception()):
             LOGGER.debug("Unhandled exception in event handler: %s", exc)
 
+    def _schedule(self, coro):
+        task = self.loop.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._task_done)
+
     def emit(self, event, **kwargs):
-        listeners = self._listeners.get(event, ())
-        once = self._once_listeners.pop(event, ())
-        for listener in (*listeners, *once):
-            task = self.loop.create_task(listener(**kwargs))
-            self._tasks.add(task)
-            task.add_done_callback(self._task_done)
+        listeners = self._listeners.get(event)
+        once = self._once_listeners.pop(event, None)
+
+        # snapshot the live list so listeners can call on/off mid-emit;
+        # once entries were popped above, so they are already ours
+        if listeners:
+            entries = (*listeners, *once) if once else tuple(listeners)
+        elif once:
+            entries = once
+        else:
+            return
+
+        for listener, is_async in entries:
+            if is_async:
+                self._schedule(listener(**kwargs))
+                continue
+
+            try:
+                result = listener(**kwargs)
+            except Exception:  # pylint: disable=broad-except
+                LOGGER.exception("Error in %s handler %r", event, listener)
+                continue
+
+            # async callables that iscoroutinefunction can't detect
+            # (e.g. an object with an async __call__)
+            if result is not None and inspect.isawaitable(result):
+                self._schedule(result)
 
     async def wait_for_complete(self):
         """Wait for all pending handler tasks to finish."""
@@ -101,7 +137,7 @@ class Devtools(EventEmitter):
         """
         future = self.loop.create_future()
 
-        async def update_future(**kwargs):
+        def update_future(**kwargs):
             if not future.cancelled():
                 future.set_result(kwargs)
 
@@ -130,11 +166,13 @@ class Devtools(EventEmitter):
         Match incoming message ids to self.futures
         Emit events for incoming methods
         """
-        if message_obj.method:
-            if message_obj.params:
-                self.emit(message_obj.method, **message_obj.params)
-            else:
-                self.emit(message_obj.method)
+        if method := message_obj.method:
+            # skip the **params repack when nothing is subscribed
+            if self.has_listeners(method):
+                if message_obj.params:
+                    self.emit(method, **message_obj.params)
+                else:
+                    self.emit(method)
 
         elif message_obj.id is not None:
             future = self.futures.pop(message_obj.id, None)
