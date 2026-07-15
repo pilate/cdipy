@@ -112,7 +112,9 @@ class Message(msgspec.Struct):  # pylint: disable=too-few-public-methods
     sessionId: str = None
 
 
-class Command(msgspec.Struct, omit_defaults=True):  # pylint: disable=too-few-public-methods
+class Command(
+    msgspec.Struct, omit_defaults=True
+):  # pylint: disable=too-few-public-methods
     id: int
     method: str
     params: dict
@@ -216,7 +218,9 @@ class Devtools(EventEmitter):
         else:
             LOGGER.error("Unknown message format: %s", message_obj)
 
-    async def execute_method(self, method: str, params: dict, wait: bool = True) -> dict:
+    async def execute_method(
+        self, method: str, params: dict, wait: bool = True
+    ) -> dict:
         """
         Called by the add_command wrapper with the method name and validated arguments
         """
@@ -225,7 +229,9 @@ class Devtools(EventEmitter):
         if wait:
             future = self.futures[cmd_id] = self.loop.create_future()
 
-        command = Command(id=cmd_id, method=method, params=params, sessionId=self.session)
+        command = Command(
+            id=cmd_id, method=method, params=params, sessionId=self.session
+        )
 
         try:
             await self.send(command)
@@ -236,7 +242,7 @@ class Devtools(EventEmitter):
 
         if wait:
             return await future
-        
+
         return None
 
     async def send(self, command: Command):
