@@ -78,15 +78,6 @@ class DynamicDomain:
         return wrapper
 
 
-class DynamicDomains:
-    """DOMAINS stand-in: any capitalized name resolves to a domain."""
-
-    @staticmethod
-    def get(name):
-        if name[:1].isupper():
-            return lambda devtools: DynamicDomain(devtools, name)
-
-
 def load_domains():
     cache_path = get_cache_path()
 
@@ -119,4 +110,16 @@ def load_domains():
     return domains
 
 
-DOMAINS = DynamicDomains() if SKIP_VALIDATION else load_domains()
+def resolve_domain(devtools, name):
+    """
+    Return a domain bound to `devtools` for `name`, or None if `name` is
+    not a domain. With validation off, any capitalized name resolves.
+    """
+    if domain_class := DOMAINS.get(name):
+        return domain_class(devtools)
+
+    if SKIP_VALIDATION and name[:1].isupper():
+        return DynamicDomain(devtools, name)
+
+
+DOMAINS = {} if SKIP_VALIDATION else load_domains()

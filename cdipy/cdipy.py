@@ -11,7 +11,7 @@ import websockets.asyncio.connection
 import websockets.exceptions
 
 from .exceptions import ChromeClosedException, ResponseErrorException
-from .protocol import DOMAINS
+from .protocol import resolve_domain
 
 
 LOGGER = logging.getLogger("cdipy.cdipy")
@@ -183,8 +183,8 @@ class Devtools(EventEmitter):
         """
         Load each domain on demand
         """
-        if domain := DOMAINS.get(attr):
-            setattr(self, attr, domain(self))
+        if domain := resolve_domain(self, attr):
+            setattr(self, attr, domain)
 
         return super().__getattribute__(attr)
 
