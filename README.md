@@ -85,4 +85,4 @@ By default, cdipy validates the parameters you pass to CDP commands against the 
 export CDIPY_SKIP_VALIDATION=1
 ```
 
-This passes your keyword arguments directly to the protocol without checking them against the command signature. Useful if the cached protocol definition is out of date or you want to avoid the overhead of signature binding.
+This passes your keyword arguments directly to the protocol without checking them against the command's parameter list. Domains and commands are resolved dynamically by name, so the protocol definition is never downloaded at all. Useful if the cached protocol definition is out of date, or to avoid the download entirely.

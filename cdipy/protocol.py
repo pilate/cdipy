@@ -33,27 +33,58 @@ def add_command(domain_class, command):
         param["name"] for param in parameters if not param.get("optional")
     )
 
-    if SKIP_VALIDATION:
-        async def wrapper(self, **kwargs):
-            wait = kwargs.pop("_wait", True)
-            return await self.devtools.execute_method(command_str, kwargs, wait=wait)
-
-    else:
-        async def wrapper(self, **kwargs):
-            wait = kwargs.pop("_wait", True)
-            if missing := required_params - kwargs.keys():
-                raise TypeError(
-                    f"{command_str}() missing required arguments: {', '.join(sorted(missing))}"
-                )
-            if unexpected := kwargs.keys() - valid_params:
-                raise TypeError(
-                    f"{command_str}() got unexpected arguments: {', '.join(sorted(unexpected))}"
-                )
-            return await self.devtools.execute_method(command_str, kwargs, wait=wait)
+    async def wrapper(self, **kwargs):
+        wait = kwargs.pop("_wait", True)
+        if missing := required_params - kwargs.keys():
+            raise TypeError(
+                f"{command_str}() missing required arguments: {', '.join(sorted(missing))}"
+            )
+        if unexpected := kwargs.keys() - valid_params:
+            raise TypeError(
+                f"{command_str}() got unexpected arguments: {', '.join(sorted(unexpected))}"
+            )
+        return await self.devtools.execute_method(command_str, kwargs, wait=wait)
 
     wrapper.__name__ = wrapper.__qualname__ = command_str
 
     setattr(domain_class, command_name, wrapper)
+
+
+class DynamicDomain:
+    """
+    Resolves commands by name, for when validation (and the protocol
+    download) is skipped. cdi.Page.navigate(...) -> execute_method("Page.navigate", ...)
+    """
+
+    def __init__(self, devtools, name):
+        self.devtools = devtools
+        self.name = name
+        self.commands = {}
+
+    def __getattr__(self, command_name):
+        if wrapper := self.commands.get(command_name):
+            return wrapper
+
+        if command_name.startswith("_"):
+            raise AttributeError(command_name)
+
+        command_str = f"{self.name}.{command_name}"
+
+        async def wrapper(**kwargs):
+            wait = kwargs.pop("_wait", True)
+            return await self.devtools.execute_method(command_str, kwargs, wait=wait)
+
+        self.commands[command_name] = wrapper
+        return wrapper
+
+
+class DynamicDomains:
+    """DOMAINS stand-in: any capitalized name resolves to a domain."""
+
+    @staticmethod
+    def get(name):
+        if name[:1].isupper():
+            return lambda devtools: DynamicDomain(devtools, name)
 
 
 def load_domains():
@@ -88,4 +119,4 @@ def load_domains():
     return domains
 
 
-DOMAINS = load_domains()
+DOMAINS = DynamicDomains() if SKIP_VALIDATION else load_domains()
