@@ -102,6 +102,7 @@ class ChromeRunner:
         headless: str = "new",
         log_output: bool = False,
         timeout: float = 30,
+        preexec_fn=None,
     ) -> None:
         command = [
             chrome_path,
@@ -128,12 +129,20 @@ class ChromeRunner:
         if log_output:
             output = open(os.path.join(self.data_dir, "chrome.log"), "wb")
 
+        # setsid must run so kill() can killpg the whole process group; the
+        # caller's hook runs after it, still in the child before exec (e.g.
+        # to reset signal dispositions, which are inherited across execve)
+        def _preexec():
+            os.setsid()
+            if preexec_fn:
+                preexec_fn()
+
         try:
             self.proc = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=output,
                 stderr=subprocess.STDOUT,
-                preexec_fn=os.setsid,
+                preexec_fn=_preexec,
             )
         finally:
             if log_output:
