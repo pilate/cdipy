@@ -178,6 +178,8 @@ class Devtools(EventEmitter):
         for future in pending:
             if not future.done():
                 future.set_exception(exc)
+                # silence "exception was never retrieved" for abandoned futures
+                future.exception()
 
     def __getattr__(self, attr: str):
         """
